@@ -62,7 +62,7 @@ export default function CheckoutReceipt() {
       <Card className="w-full max-w-md shadow-lg rounded-none border-t-8 border-t-primary print:shadow-none print:border-none print:m-0 print:p-0">
         <CardHeader className="text-center pb-4 border-b border-dashed">
           <CardTitle className="text-2xl font-bold uppercase tracking-widest text-primary">
-            {receipt.storeName || "PharmaPOS"}
+            {receipt.storeName || "PharmaOS"}
           </CardTitle>
           <div className="text-sm text-muted-foreground mt-2 space-y-1">
             <p>{receipt.storeAddress || "123 Health Ave, Medical District"}</p>

@@ -151,7 +151,7 @@ export default function Checkout() {
       const res = await fetch(`${API_BASE}/transactions/mpesa/initiate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: normalised, amount: totals.total, accountRef: "PharmaPOS" }),
+        body: JSON.stringify({ phone: normalised, amount: totals.total, accountRef: "PharmaOS" }),
       });
 
       if (!res.ok) {
