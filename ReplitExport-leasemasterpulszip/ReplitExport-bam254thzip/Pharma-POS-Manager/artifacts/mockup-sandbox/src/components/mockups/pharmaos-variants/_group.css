@@ -1,0 +1,191 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.emerald-theme {
+  --bg-dark: #070e0a;
+  --bg-sidebar: #0a1510;
+  --bg-card: #111c15;
+  --emerald-accent: #00c46a;
+  --gold-accent: #e8c97a;
+  --border-subtle: rgba(0, 200, 100, 0.15);
+  
+  background-color: var(--bg-dark);
+  color: white;
+  min-height: 100vh;
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  position: relative;
+}
+
+.emerald-theme::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 1px,
+    rgba(0, 0, 0, 0.05) 1px,
+    rgba(0, 0, 0, 0.05) 2px
+  );
+  pointer-events: none;
+  z-index: 50;
+}
+
+.emerald-card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.5rem;
+  overflow: hidden;
+  position: relative;
+}
+
+@keyframes pulse-glow {
+  0% { box-shadow: 0 0 0 0 rgba(232, 201, 122, 0.2); border-color: rgba(232, 201, 122, 0.3); }
+  50% { box-shadow: 0 0 20px 0 rgba(232, 201, 122, 0.1); border-color: rgba(232, 201, 122, 0.5); }
+  100% { box-shadow: 0 0 0 0 rgba(232, 201, 122, 0.2); border-color: rgba(232, 201, 122, 0.3); }
+}
+
+.pulse-card {
+  animation: pulse-glow 4s infinite ease-in-out;
+}
+
+.emerald-text {
+  color: var(--emerald-accent);
+}
+
+.gold-text {
+  color: var(--gold-accent);
+}
+
+.stat-value {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.chart-bar-container {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  height: 200px;
+  padding-top: 20px;
+}
+
+.chart-bar-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  height: 100%;
+}
+
+.chart-bar {
+  width: 100%;
+  background: linear-gradient(to top, rgba(0,196,106,0.2), rgba(0,196,106,0.8));
+  border-top-left-radius: 4px;
+  border-top-right-radius: 4px;
+  transition: all 0.3s ease;
+  border-top: 1px solid #00c46a;
+}
+
+.chart-bar:hover {
+  background: linear-gradient(to top, rgba(0,196,106,0.4), rgba(0,196,106,1));
+  box-shadow: 0 0 15px rgba(0, 196, 106, 0.3);
+}
+
+.chart-label {
+  margin-top: 8px;
+  font-size: 0.75rem;
+  color: rgba(255,255,255,0.5);
+}
+
+/* NEON CYBERPUNK STYLES */
+
+.cyberpunk-theme {
+  --bg-dark: #050a0e;
+  --bg-sidebar: #030d1a;
+  --bg-card: #08121a;
+  --neon-green: #00ff9d;
+  --neon-cyan: #00e5ff;
+  --neon-magenta: #ff00ff;
+  
+  background-color: var(--bg-dark);
+  color: white;
+  min-height: 100vh;
+  font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+  position: relative;
+}
+
+.cyberpunk-theme.scanlines::after {
+  content: " ";
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: 0;
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+  z-index: 50;
+  background-size: 100% 2px, 3px 100%;
+  pointer-events: none;
+}
+
+.neon-font {
+  font-family: 'Share Tech Mono', monospace;
+}
+
+@keyframes neon-pulse-green {
+  0% { box-shadow: 0 0 5px var(--neon-green), inset 0 0 2px var(--neon-green); border-color: rgba(0,255,157,0.5); }
+  50% { box-shadow: 0 0 15px var(--neon-green), inset 0 0 5px var(--neon-green); border-color: var(--neon-green); }
+  100% { box-shadow: 0 0 5px var(--neon-green), inset 0 0 2px var(--neon-green); border-color: rgba(0,255,157,0.5); }
+}
+
+@keyframes neon-pulse-cyan {
+  0% { box-shadow: 0 0 5px var(--neon-cyan), inset 0 0 2px var(--neon-cyan); border-color: rgba(0,229,255,0.5); }
+  50% { box-shadow: 0 0 15px var(--neon-cyan), inset 0 0 5px var(--neon-cyan); border-color: var(--neon-cyan); }
+  100% { box-shadow: 0 0 5px var(--neon-cyan), inset 0 0 2px var(--neon-cyan); border-color: rgba(0,229,255,0.5); }
+}
+
+.cyberpunk-card {
+  background-color: var(--bg-card);
+  border: 1px solid rgba(0, 255, 157, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.cyberpunk-card:hover {
+  animation: neon-pulse-green 1.5s infinite alternate;
+}
+
+.cyberpunk-card-cyan:hover {
+  animation: neon-pulse-cyan 1.5s infinite alternate;
+  border-color: rgba(0, 229, 255, 0.3);
+}
+
+.glitch-hover:hover {
+  color: var(--neon-cyan);
+  text-shadow: 0 0 8px var(--neon-cyan);
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.live-dot {
+  animation: blink 1s infinite;
+}
+
+.cyberpunk-chart-bar {
+  background: linear-gradient(to top, rgba(0,255,157,0.2), rgba(0,255,157,0.8));
+  border-top: 2px solid var(--neon-green);
+  transition: all 0.3s ease;
+}
+
+.cyberpunk-chart-bar:hover {
+  background: linear-gradient(to top, rgba(0,229,255,0.4), rgba(0,229,255,1));
+  border-top: 2px solid var(--neon-cyan);
+  box-shadow: 0 0 15px var(--neon-cyan);
+}
