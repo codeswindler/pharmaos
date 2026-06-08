@@ -1,8 +1,11 @@
-import { Switch, Route, Router as WouterRouter } from "wouter";
+import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Layout } from "@/components/layout/Layout";
+import { AdminLayout } from "@/components/layout/AdminLayout";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { Loader2 } from "lucide-react";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/dashboard";
 import Checkout from "@/pages/checkout";
@@ -14,10 +17,47 @@ import Inventory from "@/pages/inventory";
 import Customers from "@/pages/customers";
 import Transactions from "@/pages/transactions";
 import Messages from "@/pages/messages";
+import LoginPage from "@/pages/login";
+import AdminDashboard from "@/pages/admin/index";
+import HospitalsList from "@/pages/admin/hospitals";
+import HospitalForm from "@/pages/admin/hospital-form";
 
 const queryClient = new QueryClient();
 
+function AppLoader() {
+  return (
+    <div className="min-h-screen flex items-center justify-center" style={{ background: "#080f1c" }}>
+      <div className="flex flex-col items-center gap-3">
+        <Loader2 size={28} className="animate-spin text-green-400" />
+        <p className="text-white/40 text-sm">Loading PharmaOS…</p>
+      </div>
+    </div>
+  );
+}
+
 function Router() {
+  const { user, loading } = useAuth();
+  const [location, navigate] = useLocation();
+
+  if (loading) return <AppLoader />;
+
+  if (!user) {
+    if (location !== "/login") return <LoginPage />;
+    return <LoginPage />;
+  }
+
+  if (user.role === "admin") {
+    return (
+      <Switch>
+        <Route path="/admin" component={() => <AdminLayout><AdminDashboard /></AdminLayout>} />
+        <Route path="/admin/hospitals" component={() => <AdminLayout><HospitalsList /></AdminLayout>} />
+        <Route path="/admin/hospitals/new" component={() => <AdminLayout><HospitalForm /></AdminLayout>} />
+        <Route path="/admin/hospitals/:id/edit" component={() => <AdminLayout><HospitalForm /></AdminLayout>} />
+        <Route component={() => { navigate("/admin"); return null; }} />
+      </Switch>
+    );
+  }
+
   return (
     <Switch>
       <Route path="/" component={() => <Layout><Dashboard /></Layout>} />
@@ -40,9 +80,11 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <Router />
-        </WouterRouter>
+        <AuthProvider>
+          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+            <Router />
+          </WouterRouter>
+        </AuthProvider>
         <Toaster />
       </TooltipProvider>
     </QueryClientProvider>

@@ -7,11 +7,14 @@ import {
   Users, 
   FileText, 
   MessageSquare,
+  LogOut,
 } from "lucide-react";
 import { PharmaPOSLogo } from "./PharmaPOSLogo";
+import { useAuth } from "@/contexts/AuthContext";
 
 export function Sidebar() {
   const [location] = useLocation();
+  const { user, logout } = useAuth();
 
   const links = [
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -81,18 +84,25 @@ export function Sidebar() {
         <div className="sidebar-divider" />
       </div>
 
-      <div className="px-4 pb-4">
+      <div className="px-4 pb-4 space-y-2">
         <div className="sidebar-status-card rounded-xl px-3 py-2.5 flex items-center gap-2.5">
-          <div className="relative">
+          <div className="relative flex-shrink-0">
             <div className="w-2 h-2 rounded-full bg-green-400" />
             <div className="absolute inset-0 w-2 h-2 rounded-full bg-green-400 animate-ping opacity-50" />
           </div>
-          <div>
-            <p className="text-[10px] font-semibold text-white/80">System Online</p>
+          <div className="min-w-0 flex-1">
+            <p className="text-[10px] font-semibold text-white/80 truncate">{user?.name ?? "System Online"}</p>
             <p className="text-[9px] text-sidebar-muted">All services running</p>
           </div>
+          <button
+            onClick={logout}
+            title="Sign out"
+            className="flex-shrink-0 w-6 h-6 rounded-lg flex items-center justify-center text-white/35 hover:text-red-400 transition-colors"
+          >
+            <LogOut size={12} />
+          </button>
         </div>
-        <p className="text-[9px] text-sidebar-muted text-center mt-2 tracking-wider">PharmaOS v1.0 · EAT (GMT+3)</p>
+        <p className="text-[9px] text-sidebar-muted text-center tracking-wider">PharmaOS v1.0 · EAT (GMT+3)</p>
       </div>
     </div>
   );
