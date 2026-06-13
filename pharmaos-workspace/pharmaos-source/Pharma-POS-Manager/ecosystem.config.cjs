@@ -13,6 +13,7 @@ module.exports = {
       env: {
         NODE_ENV: "production",
         PORT: process.env.PORT ?? "5000",
+        HOST: process.env.HOST ?? "127.0.0.1",
         DATABASE_URL: databaseUrl,
         SERVE_WEB: "true",
         WEB_DIST_DIR: process.env.WEB_DIST_DIR ?? "artifacts/pharma-pos/dist/public",
