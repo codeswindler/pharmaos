@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { useListProducts } from "@workspace/api-client-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -51,7 +51,12 @@ export default function Checkout() {
   const [mpesaPhone, setMpesaPhone] = useState("");
   const [unmatched, setUnmatched] = useState<Payment[]>([]);
   const [suggested, setSuggested] = useState<Payment | null>(null);
+  const rejectedSuggestionsRef = useRef<Set<number>>(new Set());
+  const knownUnmatchedRef = useRef<Set<number>>(new Set());
   const [busy, setBusy] = useState(false);
+  const [paymentScanBusy, setPaymentScanBusy] = useState(false);
+  const [paymentScanError, setPaymentScanError] = useState<string | null>(null);
+  const [lastPaymentScanAt, setLastPaymentScanAt] = useState<Date | null>(null);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [paymentMode, setPaymentMode] = useState<PaymentMode>("chooser");
   const { data: products, isLoading } = useListProducts({ search });
@@ -84,16 +89,41 @@ export default function Checkout() {
     return fresh;
   };
 
-  const loadUnmatched = async (showSuggestion = false, checkoutId = checkout?.id) => {
+  const loadUnmatched = async (
+    showSuggestion = false,
+    checkoutId = checkout?.id,
+    options: { toastErrors?: boolean; suggestOnlyNew?: boolean } = {},
+  ) => {
     if (!checkoutId) return;
-    const rows = await api(`/payments/unmatched?checkoutId=${checkoutId}`);
-    setUnmatched(rows);
-    if (showSuggestion && rows[0]) setSuggested(rows[0]);
+    setPaymentScanBusy(true);
+    setPaymentScanError(null);
+    try {
+      const rows = await api(`/payments/unmatched?checkoutId=${checkoutId}`);
+      setUnmatched(rows);
+      setLastPaymentScanAt(new Date());
+
+      if (showSuggestion) {
+        const balance = checkout?.balanceAmount ?? Number.POSITIVE_INFINITY;
+        const candidate = rows.find((payment: Payment) =>
+          payment.amount <= balance &&
+          !rejectedSuggestionsRef.current.has(payment.id) &&
+          (!options.suggestOnlyNew || !knownUnmatchedRef.current.has(payment.id))
+        );
+        if (candidate) setSuggested(candidate);
+      }
+
+      knownUnmatchedRef.current = new Set(rows.map((payment: Payment) => payment.id));
+    } catch (error: any) {
+      setPaymentScanError(error.message || "Could not check M-PESA payments");
+      if (options.toastErrors) throw error;
+    } finally {
+      setPaymentScanBusy(false);
+    }
   };
 
   const findPayments = async (showSuggestion = false) => {
     try {
-      await loadUnmatched(showSuggestion);
+      await loadUnmatched(showSuggestion, checkout?.id, { toastErrors: true });
     } catch (error: any) {
       toast({ title: error.message, variant: "destructive" });
     }
@@ -104,10 +134,31 @@ export default function Checkout() {
     const events = new EventSource(`/api/payments/events?token=${encodeURIComponent(token)}`);
     events.onmessage = (event) => {
       const data = JSON.parse(event.data);
-      if (data.type === "payment_received") void findPayments(true);
+      if (data.type === "payment_received") {
+        const payment = data.payment as Payment | undefined;
+        void loadUnmatched(false, checkout.id);
+        if (
+          payment &&
+          payment.amount <= checkout.balanceAmount &&
+          !rejectedSuggestionsRef.current.has(payment.id)
+        ) {
+          setSuggested(payment);
+        }
+      }
     };
     return () => events.close();
   }, [checkout?.id, token]);
+
+  useEffect(() => {
+    if (!checkout || checkout.status !== "open" || paymentMode !== "mpesa" || !paymentModalOpen) return;
+
+    void loadUnmatched(false, checkout.id);
+    const intervalId = window.setInterval(() => {
+      void loadUnmatched(true, checkout.id, { suggestOnlyNew: true });
+    }, 3500);
+
+    return () => window.clearInterval(intervalId);
+  }, [checkout?.id, checkout?.balanceAmount, paymentMode, paymentModalOpen]);
 
   const add = (product: any) => {
     if (checkout || product.stockQty <= 0) return;
@@ -147,7 +198,11 @@ export default function Checkout() {
     setPaymentModalOpen(true);
     if (mode === "cash") setCashAmount("");
     if (mode === "stk") setMpesaAmount(String(checkout.balanceAmount));
-    if (mode === "mpesa") await findPayments();
+    if (mode === "mpesa") {
+      rejectedSuggestionsRef.current.clear();
+      knownUnmatchedRef.current.clear();
+      await findPayments();
+    }
   };
 
   const addCash = async () => {
@@ -191,6 +246,10 @@ export default function Checkout() {
       setCart([]);
       setCustomerName("");
       setUnmatched([]);
+      setPaymentScanError(null);
+      setLastPaymentScanAt(null);
+      rejectedSuggestionsRef.current.clear();
+      knownUnmatchedRef.current.clear();
       setPaymentModalOpen(false);
       setPaymentMode("chooser");
     } catch (error: any) { toast({ title: error.message, variant: "destructive" }); }
@@ -343,9 +402,40 @@ export default function Checkout() {
                 <div className="rounded-xl border bg-slate-50 p-4">
                   <p className="font-semibold">Ask the customer to pay any amount up to {money(checkout.balanceAmount)} via MPESA.</p>
                   <p className="mt-1 text-sm text-muted-foreground">Incoming payments appear here for cashier confirmation before attachment.</p>
-                  <Button variant="outline" className="mt-4" onClick={() => void findPayments()} disabled={busy}><RefreshCw className="mr-2 h-4 w-4" /> Find payments</Button>
+                  <div className="mt-4 rounded-lg border border-green-200 bg-white p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="relative flex h-10 w-10 items-center justify-center">
+                          <span className="absolute h-10 w-10 animate-ping rounded-full bg-green-400/25" />
+                          <span className="absolute h-7 w-7 animate-pulse rounded-full bg-green-500/15" />
+                          <RefreshCw className={`relative h-5 w-5 text-green-700 ${paymentScanBusy ? "animate-spin" : ""}`} />
+                        </div>
+                        <div>
+                          <p className="text-sm font-black text-green-800">Always looking for matching M-PESA payments</p>
+                          <p className="text-xs text-muted-foreground">
+                            Scanning every few seconds for payments up to {money(checkout.balanceAmount)}.
+                            {lastPaymentScanAt ? ` Last checked ${lastPaymentScanAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}.` : ""}
+                          </p>
+                        </div>
+                      </div>
+                      <Button variant="outline" size="sm" onClick={() => void findPayments()} disabled={paymentScanBusy}>
+                        <RefreshCw className={`mr-2 h-4 w-4 ${paymentScanBusy ? "animate-spin" : ""}`} /> Refresh now
+                      </Button>
+                    </div>
+                    <div className="mt-3 h-1 overflow-hidden rounded-full bg-green-100">
+                      <div className="h-full w-1/2 animate-pulse rounded-full bg-green-500" />
+                    </div>
+                    {paymentScanError && <p className="mt-2 text-xs font-semibold text-destructive">{paymentScanError}</p>}
+                  </div>
                 </div>
-                <PaymentList unmatched={unmatched} checkout={checkout} busy={busy} onAttach={attachMpesa} />
+                <PaymentList
+                  unmatched={unmatched}
+                  checkout={checkout}
+                  busy={busy}
+                  scanning={paymentScanBusy}
+                  lastScannedAt={lastPaymentScanAt}
+                  onAttach={attachMpesa}
+                />
               </div>
             )}
 
@@ -396,7 +486,7 @@ export default function Checkout() {
               <p className="text-sm text-muted-foreground">{suggested.payerPhone} - {suggested.referenceCode}</p>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <Button variant="outline" onClick={() => { setSuggested(null); void findPayments(); }}><X className="mr-2 h-4 w-4" /> No</Button>
+              <Button variant="outline" onClick={() => { rejectedSuggestionsRef.current.add(suggested.id); setSuggested(null); void findPayments(); }}><X className="mr-2 h-4 w-4" /> No</Button>
               <Button onClick={() => attachMpesa(suggested)} disabled={busy || suggested.amount > (checkout?.balanceAmount ?? 0)}><Check className="mr-2 h-4 w-4" /> Yes, attach</Button>
             </div>
             {suggested.amount > (checkout?.balanceAmount ?? 0) && <p className="text-sm text-destructive">This MPESA payment exceeds the remaining balance and cannot be attached.</p>}
@@ -411,19 +501,40 @@ function PaymentList({
   unmatched,
   checkout,
   busy,
+  scanning,
+  lastScannedAt,
   onAttach,
 }: {
   unmatched: Payment[];
   checkout: CheckoutData;
   busy: boolean;
+  scanning: boolean;
+  lastScannedAt: Date | null;
   onAttach: (payment: Payment) => void;
 }) {
   if (unmatched.length === 0) {
-    return <div className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">No recent unmatched MPESA payments found yet.</div>;
+    return (
+      <div className="rounded-xl border border-dashed border-green-200 bg-green-50/40 p-6 text-center text-sm text-muted-foreground">
+        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-sm">
+          <RefreshCw className={`h-5 w-5 text-green-700 ${scanning ? "animate-spin" : "animate-pulse"}`} />
+        </div>
+        <p className="font-semibold text-slate-800">No matching M-PESA payment found yet.</p>
+        <p className="mt-1">
+          Still watching for a customer payment of {money(checkout.balanceAmount)} or less.
+          {lastScannedAt ? ` Last scan ${lastScannedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}.` : ""}
+        </p>
+      </div>
+    );
   }
   return (
     <div className="space-y-2">
-      <h3 className="font-bold">Recent unmatched MPESA payments</h3>
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="font-bold">Recent unmatched MPESA payments</h3>
+        <span className="inline-flex items-center rounded-full bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-700">
+          <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${scanning ? "animate-spin" : ""}`} />
+          Live scan
+        </span>
+      </div>
       {unmatched.map(payment => (
         <div key={payment.id} className="flex items-center justify-between gap-3 rounded-lg border p-3">
           <span>
