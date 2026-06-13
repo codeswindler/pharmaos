@@ -6,7 +6,7 @@ import { count, desc, eq } from "drizzle-orm";
 import { requireSuperAdmin, type AuthenticatedRequest } from "../middleware/auth";
 import { decryptSecret, encryptSecret, maskSecret, normalizePhone } from "../lib/security";
 import { logger } from "../lib/logger";
-import { DEFAULT_MODULE_KEYS, PHARMACY_MODULES, getEnabledModules, setEnabledModules } from "../lib/modules";
+import { DEFAULT_MODULE_KEYS, PHARMACY_MODULES, getEnabledModules, getUserEnabledModules, setEnabledModules, setUserEnabledModules } from "../lib/modules";
 
 const router = Router();
 router.use(requireSuperAdmin);
@@ -97,6 +97,28 @@ router.patch("/users/:id", async (req, res) => {
   if (password) update.passwordHash = await bcrypt.hash(String(password), 12);
   await db.update(usersTable).set(update).where(eq(usersTable.id, id));
   res.json({ success: true });
+});
+
+router.get("/users/:id/permissions", async (req, res) => {
+  const userId = Number(req.params.id);
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+  if (!user) return void res.status(404).json({ error: "User not found" });
+  if (user.role === "super_admin") {
+    return void res.json({ modules: PHARMACY_MODULES, enabledModules: DEFAULT_MODULE_KEYS, pharmacyModules: DEFAULT_MODULE_KEYS, unrestricted: true });
+  }
+  const pharmacyModules = await getEnabledModules(user.pharmacyId);
+  res.json({ modules: PHARMACY_MODULES, enabledModules: await getUserEnabledModules(user.id, user.pharmacyId), pharmacyModules, unrestricted: false });
+});
+
+router.put("/users/:id/permissions", async (req, res) => {
+  const userId = Number(req.params.id);
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+  if (!user) return void res.status(404).json({ error: "User not found" });
+  if (user.role === "super_admin") return void res.status(400).json({ error: "Super admins always have full admin access" });
+  const requested: string[] = Array.isArray(req.body.modules) ? req.body.modules.map(String) : [];
+  const pharmacyModules = new Set<string>(await getEnabledModules(user.pharmacyId));
+  await setUserEnabledModules(user.id, requested.filter(key => pharmacyModules.has(key)));
+  res.json({ modules: await getUserEnabledModules(user.id, user.pharmacyId) });
 });
 
 router.get("/modules", async (_req, res) => {

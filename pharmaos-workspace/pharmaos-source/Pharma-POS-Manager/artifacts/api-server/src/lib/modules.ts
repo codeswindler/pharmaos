@@ -1,4 +1,4 @@
-import { db, pharmacyModulesTable } from "@workspace/db";
+import { db, pharmacyModulesTable, userPermissionsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
 export const PHARMACY_MODULES = [
@@ -28,4 +28,21 @@ export async function setEnabledModules(pharmacyId: number, moduleKeys: string[]
     return db.insert(pharmacyModulesTable).values(values).onDuplicateKeyUpdate({ set: values });
   }));
   return getEnabledModules(pharmacyId);
+}
+
+export async function getUserEnabledModules(userId: number, pharmacyId: number | null | undefined) {
+  const pharmacyModules = await getEnabledModules(pharmacyId);
+  if (!pharmacyId) return [];
+  const rows = await db.select().from(userPermissionsTable).where(eq(userPermissionsTable.userId, userId));
+  if (rows.length === 0) return pharmacyModules;
+  const enabled = new Set(rows.filter(row => row.enabled).map(row => row.moduleKey));
+  return pharmacyModules.filter(key => enabled.has(key));
+}
+
+export async function setUserEnabledModules(userId: number, moduleKeys: string[]) {
+  const enabled = new Set(moduleKeys.filter(key => DEFAULT_MODULE_KEYS.includes(key as any)));
+  await Promise.all(DEFAULT_MODULE_KEYS.map(moduleKey => {
+    const values = { userId, moduleKey, enabled: enabled.has(moduleKey) ? 1 : 0 };
+    return db.insert(userPermissionsTable).values(values).onDuplicateKeyUpdate({ set: values });
+  }));
 }

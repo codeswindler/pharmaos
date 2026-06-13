@@ -52,13 +52,16 @@ async function salesContacts(pharmacyId: number, recipientType: string, dateFrom
     eq(paymentsTable.method, "mpesa"),
     inArray(paymentsTable.checkoutId, checkoutIds),
   )).orderBy(desc(paymentsTable.receivedAt));
-  const unique = new Map<string, typeof rows[number]>();
+  const unique = new Map<string, { payment: typeof rows[number]; isHashed: boolean }>();
   for (const row of rows) {
     if (!row.payerPhone) continue;
-    const phone = normalizePhone(row.payerPhone);
-    if (!unique.has(phone)) unique.set(phone, row);
+    const rawPhone = String(row.payerPhone).trim();
+    const digits = rawPhone.replace(/\D/g, "");
+    const isHashed = /[a-f]/i.test(rawPhone) || digits.length > 15;
+    const phone = isHashed ? rawPhone : normalizePhone(rawPhone);
+    if (!unique.has(phone)) unique.set(phone, { payment: row, isHashed });
   }
-  return [...unique.entries()].map(([phone, payment]) => ({ phone, payment }));
+  return [...unique.entries()].map(([phone, value]) => ({ phone, ...value }));
 }
 
 async function quoteCampaign(pharmacyId: number, input: { content?: string; recipientType?: string; dateFrom?: string | null; dateTo?: string | null }) {
@@ -275,7 +278,7 @@ router.post("/:id/refresh-status", requireManagement, async (req, res) => {
         body: JSON.stringify({
           apikey: decryptSecret(settings.apiKeyEncrypted),
           partnerID: decryptSecret(settings.partnerIdEncrypted),
-          messageid: recipient.providerMessageId,
+          messageID: recipient.providerMessageId,
         }),
       });
       const delivery = parseDeliveryStatus(await response.json());
@@ -395,6 +398,7 @@ router.post("/", requireManagement, async (req, res) => {
         paymentId: contact.payment.id,
         recipientName: contact.payment.payerName,
         phone: contact.phone,
+        isHashed: contact.isHashed ? 1 : 0,
         status: "queued",
         cost: String(quote.unitsPerRecipient * quote.unitRate),
       });

@@ -1,4 +1,5 @@
 import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
+import { useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -39,7 +40,7 @@ function AppLoader() {
 }
 
 function Router() {
-  const { user, loading } = useAuth();
+  const { user, modules, loading } = useAuth();
   const [location, navigate] = useLocation();
 
   if (loading) return <AppLoader />;
@@ -65,6 +66,24 @@ function Router() {
     );
   }
 
+  const moduleRoutes: Record<string, string> = {
+    "/": "dashboard",
+    "/checkout": "checkout",
+    "/products": "products",
+    "/inventory": "inventory",
+    "/sales": "sales",
+    "/staff": "staff",
+    "/messages": "messages",
+  };
+  const requiredModule = Object.entries(moduleRoutes)
+    .sort(([a], [b]) => b.length - a.length)
+    .find(([path]) => path === "/" ? location === "/" : location.startsWith(path))?.[1];
+  if (requiredModule && !modules.includes(requiredModule)) {
+    const fallback = Object.entries(moduleRoutes).find(([, module]) => modules.includes(module))?.[0] ?? "/";
+    if (fallback !== location) navigate(fallback);
+    return null;
+  }
+
   return (
     <Switch>
       <Route path="/" component={() => <Layout><Dashboard /></Layout>} />
@@ -83,6 +102,16 @@ function Router() {
 }
 
 function App() {
+  useEffect(() => {
+    const handleWheel = (event: WheelEvent) => {
+      const input = event.target as HTMLInputElement;
+      if (!(input instanceof HTMLInputElement) || input.type !== "number" || input.disabled || input.readOnly) return;
+      input.blur();
+    };
+    document.addEventListener("wheel", handleWheel, { passive: true });
+    return () => document.removeEventListener("wheel", handleWheel);
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>

@@ -37,26 +37,29 @@ export function parseProviderResponse(payload: any) {
   const responseDescription = String(item?.["response-description"] ?? item?.responseDescription ?? item?.description ?? "");
   const providerMessageId = item?.messageid ?? item?.messageId ?? item?.message_id ?? null;
   const networkId = item?.networkid ?? item?.networkId ?? item?.network_id ?? null;
+  const mobile = item?.mobile ?? null;
   return {
     success: responseCode === "200" || responseCode === "0" || /^success$/i.test(responseDescription),
     responseCode,
     responseDescription,
     providerMessageId: providerMessageId === null ? null : String(providerMessageId),
     networkId: networkId === null ? null : String(networkId),
+    mobile: mobile === null ? null : String(mobile),
   };
 }
 
 export function parseDeliveryStatus(payload: any) {
   const item = Array.isArray(payload?.responses) ? payload.responses[0] ?? payload : payload;
-  const providerMessageId = item?.messageid ?? item?.messageId ?? item?.message_id ?? item?.id ?? null;
-  const rawStatus = String(item?.status ?? item?.deliveryStatus ?? item?.["delivery-status"] ?? item?.statusCode ?? "").toLowerCase();
+  const providerMessageId = item?.messageid ?? item?.messageID ?? item?.messageId ?? item?.["message-id"] ?? item?.message_id ?? item?.id ?? null;
+  const description = String(item?.["delivery-description"] ?? item?.description ?? item?.["response-description"] ?? item?.responseDescription ?? "");
+  const rawStatus = String(item?.status ?? item?.deliveryStatus ?? item?.["delivery-status"] ?? item?.statusCode ?? description).toLowerCase();
   const responseCode = String(item?.["response-code"] ?? item?.responseCode ?? item?.code ?? "");
-  const delivered = rawStatus.includes("deliver") || rawStatus === "success" || rawStatus === "0";
+  const delivered = rawStatus.includes("delivered") || rawStatus === "32" || rawStatus === "success" || rawStatus === "0";
   const failed = rawStatus.includes("fail") || rawStatus.includes("reject") || rawStatus.includes("expire") || rawStatus.includes("undeliver");
   return {
     providerMessageId: providerMessageId === null ? null : String(providerMessageId),
     status: delivered ? "delivered" : failed ? "failed" : "sent",
     responseCode,
-    responseDescription: String(item?.["response-description"] ?? item?.responseDescription ?? item?.description ?? rawStatus),
+    responseDescription: description || rawStatus,
   };
 }

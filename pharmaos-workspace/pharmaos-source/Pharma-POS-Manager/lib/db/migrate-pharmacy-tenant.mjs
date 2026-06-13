@@ -58,6 +58,20 @@ if (await tableExists("users")) {
   }
   await db.query("UPDATE users SET role = 'super_admin' WHERE role = 'admin'");
   await db.query("UPDATE users SET role = 'pharmacy_owner' WHERE role = 'client'");
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS user_permissions (
+      id INT NOT NULL AUTO_INCREMENT,
+      user_id INT NOT NULL,
+      module_key VARCHAR(64) NOT NULL,
+      enabled INT NOT NULL DEFAULT 1,
+      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      UNIQUE KEY user_permissions_user_module_unique (user_id, module_key),
+      CONSTRAINT user_permissions_user_id_users_id_fk FOREIGN KEY (user_id) REFERENCES users(id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
 }
 
 let firstPharmacyId = null;

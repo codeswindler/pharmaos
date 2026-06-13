@@ -149,6 +149,9 @@ try {
   if ((await db.query("SHOW TABLES LIKE 'message_recipients'"))[0].length) {
     await db.query("DELETE FROM message_recipients WHERE pharmacy_id = ?", [pharmacy.id]);
   }
+  if ((await db.query("SHOW TABLES LIKE 'sms_purchases'"))[0].length) {
+    await db.query("DELETE FROM sms_purchases WHERE pharmacy_id = ?", [pharmacy.id]);
+  }
   if ((await db.query("SHOW TABLES LIKE 'sms_wallet_transactions'"))[0].length) {
     await db.query("DELETE FROM sms_wallet_transactions WHERE pharmacy_id = ?", [pharmacy.id]);
   }
@@ -332,12 +335,11 @@ try {
 
   const keepSeedSales = process.env.DEMO_SEED_SALES === "true";
   if (!keepSeedSales) {
-    await db.query(`
-      UPDATE message_recipients mr
-      JOIN payments p ON p.id = mr.payment_id
-      SET mr.payment_id = NULL
-      WHERE p.pharmacy_id = ?
-    `, [pharmacy.id]);
+    await db.query("DELETE FROM message_recipients WHERE pharmacy_id = ?", [pharmacy.id]);
+    await db.query("DELETE FROM sms_purchases WHERE pharmacy_id = ?", [pharmacy.id]);
+    await db.query("DELETE FROM messages WHERE pharmacy_id = ?", [pharmacy.id]);
+    await db.query("DELETE FROM sms_wallet_transactions WHERE pharmacy_id = ?", [pharmacy.id]);
+    await db.query("UPDATE sms_wallets SET balance = 0 WHERE pharmacy_id = ?", [pharmacy.id]);
     await db.query("DELETE FROM payments WHERE pharmacy_id = ?", [pharmacy.id]);
     await db.query("DELETE ci FROM checkout_items ci JOIN checkouts c ON c.id = ci.checkout_id WHERE c.pharmacy_id = ?", [pharmacy.id]);
     await db.query("DELETE FROM checkouts WHERE pharmacy_id = ?", [pharmacy.id]);

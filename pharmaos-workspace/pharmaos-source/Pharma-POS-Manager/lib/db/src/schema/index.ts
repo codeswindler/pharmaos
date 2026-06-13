@@ -8,3 +8,4 @@ export * from "./legacy-transactions";
 export * from "./checkouts";
 export * from "./mpesa-configs";
 export * from "./modules";
+export * from "./user-permissions";
