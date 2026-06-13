@@ -12,7 +12,7 @@ async function main() {
     role: "super_admin",
     isActive: true,
   }).onDuplicateKeyUpdate({
-    set: { passwordHash: hash, role: "admin", isActive: true },
+    set: { passwordHash: hash, role: "super_admin", isActive: true },
   });
 
   console.log("Admin created: admin@pharmaos.co.ke / Admin@123");

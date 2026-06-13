@@ -1,3 +1,4 @@
+import bcrypt from "bcryptjs";
 import mysql from "mysql2/promise";
 
 const databaseUrl = process.env.DATABASE_URL ?? process.env.MYSQL_URL;
@@ -5,8 +6,69 @@ if (!databaseUrl) throw new Error("DATABASE_URL or MYSQL_URL must be set");
 
 const db = await mysql.createConnection(databaseUrl);
 const pharmacyName = process.env.DEMO_PHARMACY_NAME ?? "Nairobi Demo Pharmacy";
-const [[pharmacy]] = await db.query("SELECT id FROM pharmacies WHERE name = ? LIMIT 1", [pharmacyName]);
-if (!pharmacy) throw new Error(`Pharmacy not found: ${pharmacyName}`);
+const staffPassword = process.env.DEMO_STAFF_PASSWORD ?? "Owner@123";
+const staffHash = await bcrypt.hash(staffPassword, 12);
+
+let [[pharmacy]] = await db.query("SELECT id FROM pharmacies WHERE name = ? LIMIT 1", [pharmacyName]);
+if (!pharmacy) {
+  const [result] = await db.query(`
+    INSERT INTO pharmacies (name, address, phone, email, plan_type, plan_value, status)
+    VALUES (?, ?, ?, ?, 'subscription', 3500, 'active')
+  `, [
+    pharmacyName,
+    "Moi Avenue, Nairobi",
+    "254700100100",
+    "demo@pharmaos.co.ke",
+  ]);
+  pharmacy = { id: result.insertId };
+} else {
+  await db.query(`
+    UPDATE pharmacies
+    SET address = COALESCE(address, ?),
+        phone = COALESCE(phone, ?),
+        email = COALESCE(email, ?),
+        status = 'active'
+    WHERE id = ?
+  `, ["Moi Avenue, Nairobi", "254700100100", "demo@pharmaos.co.ke", pharmacy.id]);
+}
+
+const ensureStaff = async ({ name, email, phone, role }) => {
+  await db.query(`
+    INSERT INTO users (name, email, phone, password_hash, role, pharmacy_id, is_active)
+    VALUES (?, ?, ?, ?, ?, ?, true)
+    ON DUPLICATE KEY UPDATE
+      name = VALUES(name),
+      password_hash = VALUES(password_hash),
+      role = VALUES(role),
+      pharmacy_id = VALUES(pharmacy_id),
+      is_active = true
+  `, [name, email, phone, staffHash, role, pharmacy.id]);
+
+  const [[user]] = await db.query(
+    "SELECT id FROM users WHERE email = ? LIMIT 1",
+    [email],
+  );
+  return user;
+};
+
+await ensureStaff({
+  name: "Nairobi Demo Owner",
+  email: "owner@nairobidemo.test",
+  phone: "254700100101",
+  role: "pharmacy_owner",
+});
+await ensureStaff({
+  name: "Nairobi Demo Manager",
+  email: "manager@nairobidemo.test",
+  phone: "254700100102",
+  role: "manager",
+});
+await ensureStaff({
+  name: "Nairobi Demo Cashier",
+  email: "cashier@nairobidemo.test",
+  phone: "254700100103",
+  role: "cashier",
+});
 
 const [[cashier]] = await db.query(
   "SELECT id FROM users WHERE pharmacy_id = ? AND role = 'cashier' AND is_active = true ORDER BY id LIMIT 1",
