@@ -52,6 +52,13 @@ export default function Messages() {
         if (["completed", "payment_failed"].includes(data.purchase.status)) {
           window.clearInterval(timer); await load();
           toast({ title: data.purchase.status === "completed" ? "Campaign sent" : "SMS payment failed", description: data.purchase.failureReason || undefined, variant: data.purchase.status === "payment_failed" ? "destructive" : undefined });
+          if (data.purchase.status === "completed" && data.message) {
+            setComposeOpen(false);
+            setPurchase(null);
+            setQuote(null);
+            setForm({ title: "", content: "", recipientType: "all", dateFrom: "", dateTo: "", paymentPhone: user?.phone || "" });
+            await openDetails(data.message);
+          }
         }
       } catch {}
     }, 2000);

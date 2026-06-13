@@ -6,13 +6,18 @@ import { getPharmacyId, requireManagement, type AuthenticatedRequest } from "../
 
 const router = Router();
 
+const effectiveCustomerName = (checkout: typeof checkoutsTable.$inferSelect, payments: Array<typeof paymentsTable.$inferSelect>) =>
+  checkout.customerName
+  || payments.find(payment => payment.method === "mpesa" && payment.status === "attached" && payment.payerName)?.payerName
+  || null;
+
 const checkoutDetails = async (id: number, pharmacyId: number) => {
   const [checkout] = await db.select().from(checkoutsTable).where(and(eq(checkoutsTable.id, id), eq(checkoutsTable.pharmacyId, pharmacyId)));
   if (!checkout) return null;
   const items = await db.select().from(checkoutItemsTable).where(eq(checkoutItemsTable.checkoutId, id));
   const payments = await db.select().from(paymentsTable).where(eq(paymentsTable.checkoutId, id)).orderBy(paymentsTable.receivedAt);
   return {
-    ...checkout, subtotal: Number(checkout.subtotal), discountAmount: Number(checkout.discountAmount),
+    ...checkout, customerName: effectiveCustomerName(checkout, payments), subtotal: Number(checkout.subtotal), discountAmount: Number(checkout.discountAmount),
     totalAmount: Number(checkout.totalAmount), paidAmount: Number(checkout.paidAmount),
     balanceAmount: Number(checkout.balanceAmount), changeAmount: Number(checkout.changeAmount),
     items: items.map(i => ({ ...i, unitPrice: Number(i.unitPrice), totalPrice: Number(i.totalPrice) })),
@@ -24,7 +29,21 @@ router.get("/", async (req, res) => {
   const pharmacyId = getPharmacyId(req);
   await expireStaleCheckouts(pharmacyId);
   const rows = await db.select().from(checkoutsTable).where(eq(checkoutsTable.pharmacyId, pharmacyId)).orderBy(desc(checkoutsTable.createdAt));
-  res.json(rows.map(row => ({ ...row, totalAmount: Number(row.totalAmount), paidAmount: Number(row.paidAmount), balanceAmount: Number(row.balanceAmount) })));
+  const payments = await db.select().from(paymentsTable).where(eq(paymentsTable.pharmacyId, pharmacyId));
+  const paymentsByCheckout = new Map<number, Array<typeof paymentsTable.$inferSelect>>();
+  for (const payment of payments) {
+    if (!payment.checkoutId) continue;
+    const group = paymentsByCheckout.get(payment.checkoutId) ?? [];
+    group.push(payment);
+    paymentsByCheckout.set(payment.checkoutId, group);
+  }
+  res.json(rows.map(row => ({
+    ...row,
+    customerName: effectiveCustomerName(row, paymentsByCheckout.get(row.id) ?? []),
+    totalAmount: Number(row.totalAmount),
+    paidAmount: Number(row.paidAmount),
+    balanceAmount: Number(row.balanceAmount),
+  })));
 });
 
 router.post("/expire", async (req, res) => {

@@ -330,8 +330,27 @@ try {
     ON DUPLICATE KEY UPDATE balance = VALUES(balance)
   `, [pharmacy.id]);
 
+  const keepSeedSales = process.env.DEMO_SEED_SALES === "true";
+  if (!keepSeedSales) {
+    await db.query(`
+      UPDATE message_recipients mr
+      JOIN payments p ON p.id = mr.payment_id
+      SET mr.payment_id = NULL
+      WHERE p.pharmacy_id = ?
+    `, [pharmacy.id]);
+    await db.query("DELETE FROM payments WHERE pharmacy_id = ?", [pharmacy.id]);
+    await db.query("DELETE ci FROM checkout_items ci JOIN checkouts c ON c.id = ci.checkout_id WHERE c.pharmacy_id = ?", [pharmacy.id]);
+    await db.query("DELETE FROM checkouts WHERE pharmacy_id = ?", [pharmacy.id]);
+    await db.query("UPDATE products SET reserved_qty = 0 WHERE pharmacy_id = ?", [pharmacy.id]);
+    await db.query(`
+      UPDATE customers
+      SET total_spend = 0, visit_count = 0, loyalty_points = 0, last_visit = NULL
+      WHERE pharmacy_id = ?
+    `, [pharmacy.id]);
+  }
+
   await db.commit();
-  console.log(`Demo data ready for ${pharmacyName}: ${products.length} products, ${salePlans.length} completed sales, ${contactsByPhone.length} SMS sales contacts`);
+  console.log(`Demo data ready for ${pharmacyName}: ${products.length} products, ${keepSeedSales ? salePlans.length : 0} completed sales, ${keepSeedSales ? contactsByPhone.length : 0} SMS sales contacts`);
 } catch (error) {
   await db.rollback();
   throw error;
