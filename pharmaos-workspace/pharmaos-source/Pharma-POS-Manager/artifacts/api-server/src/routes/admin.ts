@@ -19,25 +19,39 @@ const readableProviderError = (raw: string, fallback: string) => {
   }
 };
 
+const maskEncryptedSecret = (value: string | null | undefined) => {
+  if (!value) return null;
+  try {
+    return maskSecret(decryptSecret(value));
+  } catch {
+    return "Stored credential - re-save to rotate";
+  }
+};
+
 const formatConfig = (config: typeof mpesaConfigsTable.$inferSelect | undefined) => config ? ({
   environment: config.environment, shortcode: config.shortcode, transactionType: config.transactionType,
-  enabled: config.enabled, consumerKey: maskSecret(decryptSecret(config.consumerKeyEncrypted)),
-  consumerSecret: maskSecret(decryptSecret(config.consumerSecretEncrypted)),
-  passkey: config.passkeyEncrypted ? maskSecret(decryptSecret(config.passkeyEncrypted)) : null,
+  enabled: config.enabled, consumerKey: maskEncryptedSecret(config.consumerKeyEncrypted),
+  consumerSecret: maskEncryptedSecret(config.consumerSecretEncrypted),
+  passkey: maskEncryptedSecret(config.passkeyEncrypted),
   registrationStatus: config.registrationStatus,
   credentialsVerifiedAt: config.credentialsVerifiedAt?.toISOString() ?? null,
   callbacksRegisteredAt: config.callbacksRegisteredAt?.toISOString() ?? null,
 }) : null;
 
 router.get("/pharmacies", async (_req, res) => {
-  const pharmacies = await db.select().from(pharmaciesTable).orderBy(desc(pharmaciesTable.createdAt));
-  const result = await Promise.all(pharmacies.map(async pharmacy => {
-    const [{ value }] = await db.select({ value: count() }).from(usersTable).where(eq(usersTable.pharmacyId, pharmacy.id));
-    const [config] = await db.select().from(mpesaConfigsTable).where(eq(mpesaConfigsTable.pharmacyId, pharmacy.id));
-    const [wallet] = await db.select().from(smsWalletsTable).where(eq(smsWalletsTable.pharmacyId, pharmacy.id));
-    return { ...pharmacy, userCount: Number(value), mpesa: formatConfig(config), smsWalletBalance: Number(wallet?.balance ?? 0) };
-  }));
-  res.json(result);
+  try {
+    const pharmacies = await db.select().from(pharmaciesTable).orderBy(desc(pharmaciesTable.createdAt));
+    const result = await Promise.all(pharmacies.map(async pharmacy => {
+      const [{ value }] = await db.select({ value: count() }).from(usersTable).where(eq(usersTable.pharmacyId, pharmacy.id));
+      const [config] = await db.select().from(mpesaConfigsTable).where(eq(mpesaConfigsTable.pharmacyId, pharmacy.id));
+      const [wallet] = await db.select().from(smsWalletsTable).where(eq(smsWalletsTable.pharmacyId, pharmacy.id));
+      return { ...pharmacy, userCount: Number(value), mpesa: formatConfig(config), smsWalletBalance: Number(wallet?.balance ?? 0) };
+    }));
+    res.json(result);
+  } catch (error) {
+    logger.error({ err: error }, "Unable to list pharmacies");
+    res.status(500).json({ error: "Unable to load pharmacies. Check the PharmaOS server logs for the exact database or credential issue." });
+  }
 });
 
 router.post("/pharmacies", async (req, res) => {
