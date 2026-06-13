@@ -11,8 +11,24 @@ import { joinUrl, parseProviderResponse } from "./sms";
 export async function ensurePlatformSmsSettings() {
   await db.insert(platformSmsSettingsTable).values({
     id: 1,
+    baseUrl: "",
+    apiKeyEncrypted: null,
+    partnerIdEncrypted: null,
+    shortcode: "",
+    sendEndpointPath: "/api/services/sendsms",
+    hashedEndpointPath: "/api/services/sendotp",
+    statusEndpointPath: "/api/services/getdlr",
+    unitRate: "1",
+    smsEnabled: 0,
     smsCallbackToken: crypto.randomBytes(24).toString("hex"),
+    mpesaEnvironment: "sandbox",
+    mpesaShortcode: "",
+    mpesaTransactionType: "CustomerPayBillOnline",
+    mpesaConsumerKeyEncrypted: null,
+    mpesaConsumerSecretEncrypted: null,
+    mpesaPasskeyEncrypted: null,
     mpesaCallbackToken: crypto.randomBytes(24).toString("hex"),
+    mpesaEnabled: 0,
   }).onDuplicateKeyUpdate({ set: { id: 1 } });
   return (await db.select().from(platformSmsSettingsTable).where(eq(platformSmsSettingsTable.id, 1)))[0];
 }

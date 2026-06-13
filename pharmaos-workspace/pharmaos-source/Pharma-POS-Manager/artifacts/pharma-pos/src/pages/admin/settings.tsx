@@ -45,7 +45,11 @@ export default function AdminSettings() {
   }, [revealed]);
   const run = async (name: string, task: () => Promise<any>) => {
     setBusy(name); setNotice(null);
-    try { const data = await task(); setNotice({ kind: "ok", text: data.message || "Action completed successfully" }); return data; }
+    try {
+      const data = await task();
+      setNotice({ kind: "ok", text: data.message || "Action completed successfully" });
+      return data;
+    }
     catch (error: any) { setNotice({ kind: "error", text: error.message }); }
     finally { setBusy(""); }
   };
@@ -68,8 +72,11 @@ export default function AdminSettings() {
     });
   };
 
+  const settingsPayload = { ...form, unitRate: Number(form.unitRate) };
+
   return <div className="max-w-4xl text-white">
-    <div className="mb-6"><h1 className="text-2xl font-bold">Platform settings</h1><p className="text-sm text-white/45">Configure global SMS delivery, pricing, and the M-PESA account that receives SMS purchases.</p></div>
+    <div className="mb-4"><h1 className="text-2xl font-bold">Platform settings</h1><p className="text-sm text-white/45">Configure global SMS delivery, pricing, and the M-PESA account that receives SMS purchases.</p></div>
+    {notice && <div role="alert" className={`sticky top-0 z-20 mb-4 rounded-lg border p-3 text-sm shadow-lg backdrop-blur ${notice.kind === "ok" ? "border-green-400/40 bg-green-950/90 text-green-200" : "border-red-400/40 bg-red-950/90 text-red-100"}`}>{notice.text}</div>}
     <form onSubmit={save} className="space-y-5">
       <section className="rounded-lg border border-white/10 p-5 grid md:grid-cols-2 gap-4">
         <div className="md:col-span-2 flex items-start justify-between gap-3"><div><h2 className="font-semibold flex gap-2"><MessageSquare size={16} className="text-green-400" /> Global SMS gateway and billing rate</h2><p className="text-xs text-white/40 mt-1">Stored encrypted: API key {masked?.apiKey || "not set"}, partner ID {masked?.partnerId || "not set"}</p></div><button type="button" onClick={reveal} className="border border-white/15 rounded-lg px-3 py-2 flex gap-2 text-sm">{revealed ? <EyeOff size={15} /> : <Eye size={15} />} {revealed ? "Hide" : "Reveal"}</button></div>
@@ -78,7 +85,7 @@ export default function AdminSettings() {
         <Field label="Rate per SMS page (KES)" name="unitRate" form={form} set={set} /><Field label="Standard send endpoint" name="sendEndpointPath" form={form} set={set} />
         <Field label="Hashed transactional endpoint" name="hashedEndpointPath" form={form} set={set} /><Field label="Fallback status endpoint" name="statusEndpointPath" form={form} set={set} />
         <label className="flex gap-2 items-center"><input type="checkbox" checked={form.smsEnabled} onChange={e => set("smsEnabled", e.target.checked)} /> Enable platform SMS gateway</label>
-        <div className="flex gap-2 items-end"><label className="text-xs text-white/60 flex-1">Test phone<input className="mt-1 w-full rounded-lg bg-white/5 border border-white/10 text-white p-2.5" value={testPhone} onChange={e => setTestPhone(e.target.value)} /></label><button type="button" disabled={Boolean(busy)} onClick={() => void run("sms-test", () => request("/api/admin/settings/test-sms", { method: "POST", body: JSON.stringify({ phone: testPhone }) }))} className="border border-white/15 rounded-lg px-3 py-2.5">Test SMS</button></div>
+        <div className="flex gap-2 items-end"><label className="text-xs text-white/60 flex-1">Test phone<input className="mt-1 w-full rounded-lg bg-white/5 border border-white/10 text-white p-2.5" value={testPhone} onChange={e => setTestPhone(e.target.value)} /></label><button type="button" disabled={Boolean(busy)} onClick={() => void run("sms-test", () => request("/api/admin/settings/test-sms", { method: "POST", body: JSON.stringify({ ...settingsPayload, phone: testPhone }) }))} className="border border-white/15 rounded-lg px-3 py-2.5">{busy === "sms-test" ? "Testing..." : "Test SMS"}</button></div>
       </section>
       <section className="rounded-lg border border-white/10 p-5 grid md:grid-cols-2 gap-4">
         <div className="md:col-span-2"><h2 className="font-semibold flex gap-2"><Smartphone size={16} className="text-green-400" /> SMS purchase M-PESA</h2><p className="text-xs text-white/40 mt-1">Stored encrypted: {masked?.mpesaConsumerKey || "key not set"}, {masked?.mpesaConsumerSecret || "secret not set"}, passkey {masked?.mpesaPasskey || "not set"}</p></div>
@@ -86,9 +93,8 @@ export default function AdminSettings() {
         <Field label="Consumer key (leave blank to keep current)" name="mpesaConsumerKey" form={form} set={set} secret revealed={revealed} /><Field label="Consumer secret (leave blank to keep current)" name="mpesaConsumerSecret" form={form} set={set} secret revealed={revealed} />
         <Field label="STK passkey (leave blank to keep current)" name="mpesaPasskey" form={form} set={set} secret revealed={revealed} /><Field label="Transaction type" name="mpesaTransactionType" form={form} set={set} />
         <label className="flex gap-2 items-center"><input type="checkbox" checked={form.mpesaEnabled} onChange={e => set("mpesaEnabled", e.target.checked)} /> Enable SMS purchase M-PESA</label>
-        <button type="button" disabled={Boolean(busy)} onClick={() => void run("mpesa-test", () => request("/api/admin/settings/test-mpesa", { method: "POST" }))} className="border border-white/15 rounded-lg px-3 py-2.5 justify-self-start">Test billing credentials</button>
+        <button type="button" disabled={Boolean(busy)} onClick={() => void run("mpesa-test", () => request("/api/admin/settings/test-mpesa", { method: "POST", body: JSON.stringify(settingsPayload) }))} className="border border-white/15 rounded-lg px-3 py-2.5 justify-self-start">{busy === "mpesa-test" ? "Testing..." : "Test billing credentials"}</button>
       </section>
-      {notice && <p className={`rounded-lg border p-3 text-sm ${notice.kind === "ok" ? "border-green-400/30 text-green-300" : "border-red-400/30 text-red-300"}`}>{notice.text}</p>}
       <button disabled={Boolean(busy)} className="bg-green-400 text-black rounded-lg px-5 py-2.5 font-semibold flex gap-2 items-center">{busy === "save" ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />} Save settings</button>
     </form>
   </div>;
