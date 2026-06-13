@@ -10,6 +10,41 @@ const initial = {
   smsBaseUrl: "", smsApiKey: "", smsPartnerId: "", smsShortcode: "", smsSendEndpointPath: "/api/services/sendsms", smsHashedEndpointPath: "/api/services/sendotp", smsStatusEndpointPath: "/api/services/getdlr", smsUnitRate: "1", smsEnabled: false,
 };
 
+type FormState = typeof initial;
+type FieldName = keyof FormState;
+
+function Field({
+  form,
+  name,
+  label,
+  onChange,
+  type = "text",
+  required = false,
+  placeholder = "",
+}: {
+  form: FormState;
+  name: FieldName;
+  label: string;
+  onChange: (name: FieldName, value: string) => void;
+  type?: string;
+  required?: boolean;
+  placeholder?: string;
+}) {
+  return (
+    <label className="text-xs text-white/60">
+      {label}
+      <input
+        className="mt-1 w-full rounded-lg bg-white/5 border border-white/10 text-white p-2.5"
+        type={type}
+        required={required}
+        placeholder={placeholder}
+        value={String(form[name] ?? "")}
+        onChange={event => onChange(name, event.target.value)}
+      />
+    </label>
+  );
+}
+
 export default function PharmacyForm() {
   const { token } = useAuth();
   const [, navigate] = useLocation();
@@ -23,7 +58,7 @@ export default function PharmacyForm() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
-  const set = (name: string, value: any) => setForm(current => ({ ...current, [name]: value }));
+  const set = (name: FieldName, value: string | boolean) => setForm(current => ({ ...current, [name]: value }));
 
   useEffect(() => {
     if (!editId) return;
@@ -72,14 +107,12 @@ export default function PharmacyForm() {
     } catch (error: any) { setMessage(error.message); } finally { setBusy(false); }
   };
 
-  const Field = ({ name, label, type = "text", required = false, placeholder = "" }: any) => <label className="text-xs text-white/60">{label}<input className="mt-1 w-full rounded-lg bg-white/5 border border-white/10 text-white p-2.5" type={type} required={required} placeholder={placeholder} value={(form as any)[name]} onChange={e => set(name, e.target.value)} /></label>;
-
   return <div className="max-w-3xl text-white"><button onClick={() => navigate("/admin/pharmacies")} className="flex gap-2 text-sm text-white/50 mb-5"><ArrowLeft size={15} /> Back to pharmacies</button><h1 className="text-2xl font-bold flex gap-2 items-center mb-6"><Building2 className="text-green-400" /> {editId ? "Edit pharmacy" : "Onboard pharmacy"}</h1>
     <form onSubmit={submit} className="space-y-5">
-      <section className="rounded-lg border border-white/10 p-5 grid md:grid-cols-2 gap-4"><h2 className="md:col-span-2 font-semibold">Pharmacy details</h2><Field name="name" label="Pharmacy name" required /><Field name="phone" label="Phone" /><Field name="email" label="Email" type="email" /><Field name="address" label="Address" /><Field name="planValue" label="Plan value" type="number" /><label className="text-xs text-white/60">Status<select className="mt-1 w-full rounded-lg bg-[#101820] border border-white/10 p-2.5" value={form.status} onChange={e => set("status", e.target.value)}><option value="active">Active</option><option value="inactive">Inactive</option><option value="suspended">Suspended</option></select></label></section>
-      {!editId && <section className="rounded-lg border border-white/10 p-5 grid md:grid-cols-2 gap-4"><h2 className="md:col-span-2 font-semibold">Pharmacy owner</h2><Field name="ownerName" label="Full name" required /><Field name="ownerPhone" label="Phone" required /><Field name="ownerEmail" label="Email" type="email" required /><Field name="ownerPassword" label="Temporary password" type="password" required /></section>}
-      <section className="rounded-lg border border-white/10 p-5 grid md:grid-cols-2 gap-4"><div className="md:col-span-2"><h2 className="font-semibold flex gap-2"><KeyRound size={16} className="text-green-400" /> M-PESA production or sandbox credentials</h2>{masked && <p className="text-xs text-white/40 mt-1">Stored encrypted: {masked.consumerKey}, {masked.consumerSecret}, passkey {masked.passkey || "not configured"}</p>}</div><Field name="shortcode" label="Paybill / Till shortcode" /><label className="text-xs text-white/60">Environment<select className="mt-1 w-full rounded-lg bg-[#101820] border border-white/10 p-2.5" value={form.environment} onChange={e => set("environment", e.target.value)}><option value="sandbox">Sandbox</option><option value="production">Production</option></select></label><Field name="consumerKey" label="Consumer key (leave blank to keep current)" type="password" /><Field name="consumerSecret" label="Consumer secret (leave blank to keep current)" type="password" /><Field name="passkey" label="STK passkey (leave blank to keep current)" type="password" /><label className="flex gap-2 items-center mt-5"><input type="checkbox" checked={form.enabled} onChange={e => set("enabled", e.target.checked)} /> Enable M-PESA for this pharmacy</label>{editId && <div className="md:col-span-2 flex gap-2"><button type="button" onClick={() => action("test")} className="border border-white/15 rounded-lg px-3 py-2">Test credentials</button><button type="button" onClick={() => action("register-callbacks")} className="border border-white/15 rounded-lg px-3 py-2">Register C2B callbacks</button></div>}</section>
-      <section className="rounded-lg border border-white/10 p-5 grid md:grid-cols-2 gap-4"><div className="md:col-span-2"><h2 className="font-semibold flex gap-2"><MessageSquare size={16} className="text-green-400" /> SMS gateway and pharmacy rate</h2>{maskedSms && <p className="text-xs text-white/40 mt-1">Stored encrypted: API key {maskedSms.apiKey || "not set"}, partner ID {maskedSms.partnerId || "not set"}</p>}</div><Field name="smsBaseUrl" label="Gateway base URL" placeholder="https://sms-provider.example" /><Field name="smsShortcode" label="SMS shortcode" /><Field name="smsApiKey" label="API key (leave blank to keep current)" type="password" /><Field name="smsPartnerId" label="Partner ID (leave blank to keep current)" type="password" /><Field name="smsUnitRate" label="Rate per SMS page (KES)" type="number" /><Field name="smsSendEndpointPath" label="Standard send endpoint path" /><Field name="smsHashedEndpointPath" label="Hashed transactional endpoint path" /><Field name="smsStatusEndpointPath" label="Fallback status endpoint path" /><label className="flex gap-2 items-center mt-5"><input type="checkbox" checked={form.smsEnabled} onChange={e => set("smsEnabled", e.target.checked)} /> Enable SMS for this pharmacy</label>{editId && <div className="md:col-span-2 rounded-lg border border-white/10 p-4 flex flex-wrap gap-3 items-end"><div><p className="text-xs text-white/50 flex gap-2 items-center"><WalletCards size={13} /> Current wallet</p><p className="text-xl font-bold">KES {walletBalance.toLocaleString()}</p></div><label className="text-xs text-white/60 ml-auto">Credit amount<input className="mt-1 w-40 rounded-lg bg-white/5 border border-white/10 text-white p-2.5" type="number" min="1" value={walletCredit} onChange={e => setWalletCredit(e.target.value)} /></label><button type="button" onClick={creditWallet} className="border border-green-400/30 text-green-300 rounded-lg px-3 py-2.5">Credit wallet</button></div>}</section>
+      <section className="rounded-lg border border-white/10 p-5 grid md:grid-cols-2 gap-4"><h2 className="md:col-span-2 font-semibold">Pharmacy details</h2><Field form={form} onChange={set} name="name" label="Pharmacy name" required /><Field form={form} onChange={set} name="phone" label="Phone" /><Field form={form} onChange={set} name="email" label="Email" type="email" /><Field form={form} onChange={set} name="address" label="Address" /><Field form={form} onChange={set} name="planValue" label="Plan value" type="number" /><label className="text-xs text-white/60">Status<select className="mt-1 w-full rounded-lg bg-[#101820] border border-white/10 p-2.5" value={form.status} onChange={e => set("status", e.target.value)}><option value="active">Active</option><option value="inactive">Inactive</option><option value="suspended">Suspended</option></select></label></section>
+      {!editId && <section className="rounded-lg border border-white/10 p-5 grid md:grid-cols-2 gap-4"><h2 className="md:col-span-2 font-semibold">Pharmacy owner</h2><Field form={form} onChange={set} name="ownerName" label="Full name" required /><Field form={form} onChange={set} name="ownerPhone" label="Phone" required /><Field form={form} onChange={set} name="ownerEmail" label="Email" type="email" required /><Field form={form} onChange={set} name="ownerPassword" label="Temporary password" type="password" required /></section>}
+      <section className="rounded-lg border border-white/10 p-5 grid md:grid-cols-2 gap-4"><div className="md:col-span-2"><h2 className="font-semibold flex gap-2"><KeyRound size={16} className="text-green-400" /> M-PESA production or sandbox credentials</h2>{masked && <p className="text-xs text-white/40 mt-1">Stored encrypted: {masked.consumerKey}, {masked.consumerSecret}, passkey {masked.passkey || "not configured"}</p>}</div><Field form={form} onChange={set} name="shortcode" label="Paybill / Till shortcode" /><label className="text-xs text-white/60">Environment<select className="mt-1 w-full rounded-lg bg-[#101820] border border-white/10 p-2.5" value={form.environment} onChange={e => set("environment", e.target.value)}><option value="sandbox">Sandbox</option><option value="production">Production</option></select></label><Field form={form} onChange={set} name="consumerKey" label="Consumer key (leave blank to keep current)" type="password" /><Field form={form} onChange={set} name="consumerSecret" label="Consumer secret (leave blank to keep current)" type="password" /><Field form={form} onChange={set} name="passkey" label="STK passkey (leave blank to keep current)" type="password" /><label className="flex gap-2 items-center mt-5"><input type="checkbox" checked={form.enabled} onChange={e => set("enabled", e.target.checked)} /> Enable M-PESA for this pharmacy</label>{editId && <div className="md:col-span-2 flex gap-2"><button type="button" onClick={() => action("test")} className="border border-white/15 rounded-lg px-3 py-2">Test credentials</button><button type="button" onClick={() => action("register-callbacks")} className="border border-white/15 rounded-lg px-3 py-2">Register C2B callbacks</button></div>}</section>
+      <section className="rounded-lg border border-white/10 p-5 grid md:grid-cols-2 gap-4"><div className="md:col-span-2"><h2 className="font-semibold flex gap-2"><MessageSquare size={16} className="text-green-400" /> SMS gateway and pharmacy rate</h2>{maskedSms && <p className="text-xs text-white/40 mt-1">Stored encrypted: API key {maskedSms.apiKey || "not set"}, partner ID {maskedSms.partnerId || "not set"}</p>}</div><Field form={form} onChange={set} name="smsBaseUrl" label="Gateway base URL" placeholder="https://sms-provider.example" /><Field form={form} onChange={set} name="smsShortcode" label="SMS shortcode" /><Field form={form} onChange={set} name="smsApiKey" label="API key (leave blank to keep current)" type="password" /><Field form={form} onChange={set} name="smsPartnerId" label="Partner ID (leave blank to keep current)" type="password" /><Field form={form} onChange={set} name="smsUnitRate" label="Rate per SMS page (KES)" type="number" /><Field form={form} onChange={set} name="smsSendEndpointPath" label="Standard send endpoint path" /><Field form={form} onChange={set} name="smsHashedEndpointPath" label="Hashed transactional endpoint path" /><Field form={form} onChange={set} name="smsStatusEndpointPath" label="Fallback status endpoint path" /><label className="flex gap-2 items-center mt-5"><input type="checkbox" checked={form.smsEnabled} onChange={e => set("smsEnabled", e.target.checked)} /> Enable SMS for this pharmacy</label>{editId && <div className="md:col-span-2 rounded-lg border border-white/10 p-4 flex flex-wrap gap-3 items-end"><div><p className="text-xs text-white/50 flex gap-2 items-center"><WalletCards size={13} /> Current wallet</p><p className="text-xl font-bold">KES {walletBalance.toLocaleString()}</p></div><label className="text-xs text-white/60 ml-auto">Credit amount<input className="mt-1 w-40 rounded-lg bg-white/5 border border-white/10 text-white p-2.5" type="number" min="1" value={walletCredit} onChange={e => setWalletCredit(e.target.value)} /></label><button type="button" onClick={creditWallet} className="border border-green-400/30 text-green-300 rounded-lg px-3 py-2.5">Credit wallet</button></div>}</section>
       {message && <p className="text-sm text-green-300">{message}</p>}<button disabled={busy} className="bg-green-400 text-black rounded-lg px-5 py-2.5 font-semibold flex gap-2 items-center">{busy ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />} Save pharmacy</button>
     </form>
   </div>;
