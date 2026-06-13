@@ -11,6 +11,9 @@ export type MessageStatus = typeof MessageStatus[keyof typeof MessageStatus];
 
 export const MessageStatus = {
   queued: 'queued',
+  awaiting_payment: 'awaiting_payment',
+  paid: 'paid',
+  payment_failed: 'payment_failed',
   processing: 'processing',
   sent: 'sent',
   delivered: 'delivered',

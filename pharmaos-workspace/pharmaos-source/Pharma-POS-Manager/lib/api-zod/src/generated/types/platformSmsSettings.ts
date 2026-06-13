@@ -6,6 +6,4 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface SmsWalletTopUpInput {
-  amount: number;
-}
+export interface PlatformSmsSettings { [key: string]: unknown }

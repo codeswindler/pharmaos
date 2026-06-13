@@ -48,6 +48,7 @@ export const messageRecipientsTable = mysqlTable("message_recipients", {
   sentAt: timestamp("sent_at", { mode: "date" }),
   deliveredAt: timestamp("delivered_at", { mode: "date" }),
   failedAt: timestamp("failed_at", { mode: "date" }),
+  creditReturnedAt: timestamp("credit_returned_at", { mode: "date" }),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

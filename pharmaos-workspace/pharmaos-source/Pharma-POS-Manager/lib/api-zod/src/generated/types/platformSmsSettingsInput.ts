@@ -6,8 +6,4 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type MessageQuoteUnitBreakdownItem = {
-  unitsPerRecipient: number;
-  recipients: number;
-  totalUnits: number;
-};
+export interface PlatformSmsSettingsInput { [key: string]: unknown }

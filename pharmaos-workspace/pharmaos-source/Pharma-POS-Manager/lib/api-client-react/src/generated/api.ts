@@ -59,14 +59,16 @@ import type {
   Pharmacy,
   PharmacyInput,
   PharmacyUpdate,
+  PlatformSmsSettings,
+  PlatformSmsSettingsInput,
   Product,
   ProductInput,
   ProductUpdate,
   Receipt,
   RevenuePeriod,
   SmsDlrPayload,
+  SmsPurchaseStart,
   SmsSummary,
-  SmsWalletTopUpInput,
   StaffInput,
   StaffMember,
   StaffUpdate,
@@ -669,6 +671,76 @@ export const useTestPharmacyMpesa = <TError = ErrorType<unknown>,
       return useMutation(getTestPharmacyMpesaMutationOptions(options));
     }
 
+export const getRevealPharmacyMpesaUrl = (id: number,) => {
+
+
+
+
+  return `/api/admin/pharmacies/${id}/mpesa/reveal`
+}
+
+/**
+ * @summary Reveal pharmacy M-PESA credentials after password confirmation
+ */
+export const revealPharmacyMpesa = async (id: number, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getRevealPharmacyMpesaUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getRevealPharmacyMpesaMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof revealPharmacyMpesa>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof revealPharmacyMpesa>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['revealPharmacyMpesa'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof revealPharmacyMpesa>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  revealPharmacyMpesa(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RevealPharmacyMpesaMutationResult = NonNullable<Awaited<ReturnType<typeof revealPharmacyMpesa>>>
+
+    export type RevealPharmacyMpesaMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Reveal pharmacy M-PESA credentials after password confirmation
+ */
+export const useRevealPharmacyMpesa = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof revealPharmacyMpesa>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof revealPharmacyMpesa>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getRevealPharmacyMpesaMutationOptions(options));
+    }
+
 export const getRegisterPharmacyMpesaCallbacksUrl = (id: number,) => {
 
 
@@ -737,6 +809,364 @@ export const useRegisterPharmacyMpesaCallbacks = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getRegisterPharmacyMpesaCallbacksMutationOptions(options));
+    }
+
+export const getGetAdminSettingsUrl = () => {
+
+
+
+
+  return `/api/admin/settings`
+}
+
+/**
+ * @summary Get masked global SMS and SMS billing M-PESA settings
+ */
+export const getAdminSettings = async ( options?: RequestInit): Promise<PlatformSmsSettings> => {
+
+  return customFetch<PlatformSmsSettings>(getGetAdminSettingsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAdminSettingsQueryKey = () => {
+    return [
+    `/api/admin/settings`
+    ] as const;
+    }
+
+
+export const getGetAdminSettingsQueryOptions = <TData = Awaited<ReturnType<typeof getAdminSettings>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminSettings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminSettingsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminSettings>>> = ({ signal }) => getAdminSettings({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminSettings>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAdminSettingsQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminSettings>>>
+export type GetAdminSettingsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get masked global SMS and SMS billing M-PESA settings
+ */
+
+export function useGetAdminSettings<TData = Awaited<ReturnType<typeof getAdminSettings>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminSettings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAdminSettingsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateAdminSettingsUrl = () => {
+
+
+
+
+  return `/api/admin/settings`
+}
+
+/**
+ * @summary Save global SMS and SMS billing M-PESA settings
+ */
+export const updateAdminSettings = async (platformSmsSettingsInput: PlatformSmsSettingsInput, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getUpdateAdminSettingsUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      platformSmsSettingsInput,)
+  }
+);}
+
+
+
+
+export const getUpdateAdminSettingsMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAdminSettings>>, TError,{data: BodyType<PlatformSmsSettingsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateAdminSettings>>, TError,{data: BodyType<PlatformSmsSettingsInput>}, TContext> => {
+
+const mutationKey = ['updateAdminSettings'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateAdminSettings>>, {data: BodyType<PlatformSmsSettingsInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateAdminSettings(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateAdminSettingsMutationResult = NonNullable<Awaited<ReturnType<typeof updateAdminSettings>>>
+    export type UpdateAdminSettingsMutationBody = BodyType<PlatformSmsSettingsInput>
+    export type UpdateAdminSettingsMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Save global SMS and SMS billing M-PESA settings
+ */
+export const useUpdateAdminSettings = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAdminSettings>>, TError,{data: BodyType<PlatformSmsSettingsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateAdminSettings>>,
+        TError,
+        {data: BodyType<PlatformSmsSettingsInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateAdminSettingsMutationOptions(options));
+    }
+
+export const getRevealAdminSettingsSecretsUrl = () => {
+
+
+
+
+  return `/api/admin/settings/reveal`
+}
+
+/**
+ * @summary Reveal encrypted platform credentials after password confirmation
+ */
+export const revealAdminSettingsSecrets = async ( options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getRevealAdminSettingsSecretsUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getRevealAdminSettingsSecretsMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof revealAdminSettingsSecrets>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof revealAdminSettingsSecrets>>, TError,void, TContext> => {
+
+const mutationKey = ['revealAdminSettingsSecrets'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof revealAdminSettingsSecrets>>, void> = () => {
+
+
+          return  revealAdminSettingsSecrets(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RevealAdminSettingsSecretsMutationResult = NonNullable<Awaited<ReturnType<typeof revealAdminSettingsSecrets>>>
+
+    export type RevealAdminSettingsSecretsMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Reveal encrypted platform credentials after password confirmation
+ */
+export const useRevealAdminSettingsSecrets = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof revealAdminSettingsSecrets>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof revealAdminSettingsSecrets>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getRevealAdminSettingsSecretsMutationOptions(options));
+    }
+
+export const getTestSmsBillingMpesaUrl = () => {
+
+
+
+
+  return `/api/admin/settings/test-mpesa`
+}
+
+/**
+ * @summary Test platform SMS billing M-PESA credentials
+ */
+export const testSmsBillingMpesa = async ( options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getTestSmsBillingMpesaUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getTestSmsBillingMpesaMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof testSmsBillingMpesa>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof testSmsBillingMpesa>>, TError,void, TContext> => {
+
+const mutationKey = ['testSmsBillingMpesa'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof testSmsBillingMpesa>>, void> = () => {
+
+
+          return  testSmsBillingMpesa(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type TestSmsBillingMpesaMutationResult = NonNullable<Awaited<ReturnType<typeof testSmsBillingMpesa>>>
+
+    export type TestSmsBillingMpesaMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Test platform SMS billing M-PESA credentials
+ */
+export const useTestSmsBillingMpesa = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof testSmsBillingMpesa>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof testSmsBillingMpesa>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getTestSmsBillingMpesaMutationOptions(options));
+    }
+
+export const getTestPlatformSmsGatewayUrl = () => {
+
+
+
+
+  return `/api/admin/settings/test-sms`
+}
+
+/**
+ * @summary Send a platform SMS gateway test
+ */
+export const testPlatformSmsGateway = async ( options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getTestPlatformSmsGatewayUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getTestPlatformSmsGatewayMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof testPlatformSmsGateway>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof testPlatformSmsGateway>>, TError,void, TContext> => {
+
+const mutationKey = ['testPlatformSmsGateway'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof testPlatformSmsGateway>>, void> = () => {
+
+
+          return  testPlatformSmsGateway(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type TestPlatformSmsGatewayMutationResult = NonNullable<Awaited<ReturnType<typeof testPlatformSmsGateway>>>
+
+    export type TestPlatformSmsGatewayMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Send a platform SMS gateway test
+ */
+export const useTestPlatformSmsGateway = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof testPlatformSmsGateway>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof testPlatformSmsGateway>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getTestPlatformSmsGatewayMutationOptions(options));
     }
 
 export const getGetAdminStatsUrl = () => {
@@ -2399,7 +2829,7 @@ export const getValidateC2bPaymentUrl = (token: string,) => {
 
 
 
-  return `/api/payments/mpesa/c2b/${token}/validation`
+  return `/api/payments/c2b/${token}/validation`
 }
 
 /**
@@ -2471,7 +2901,7 @@ export const getConfirmC2bPaymentUrl = (token: string,) => {
 
 
 
-  return `/api/payments/mpesa/c2b/${token}/confirmation`
+  return `/api/payments/c2b/${token}/confirmation`
 }
 
 /**
@@ -2543,7 +2973,7 @@ export const getReceiveStkCallbackUrl = (token: string,) => {
 
 
 
-  return `/api/payments/mpesa/stk/${token}/callback`
+  return `/api/payments/stk/${token}/callback`
 }
 
 /**
@@ -3317,9 +3747,9 @@ export const getSendMessageUrl = () => {
 /**
  * @summary Send a bulk message to customers
  */
-export const sendMessage = async (messageInput: MessageInput, options?: RequestInit): Promise<Message> => {
+export const sendMessage = async (messageInput: MessageInput, options?: RequestInit): Promise<SmsPurchaseStart> => {
 
-  return customFetch<Message>(getSendMessageUrl(),
+  return customFetch<SmsPurchaseStart>(getSendMessageUrl(),
   {
     ...options,
     method: 'POST',
@@ -3833,76 +4263,82 @@ export const useRefreshMessageStatus = <TError = ErrorType<unknown>,
       return useMutation(getRefreshMessageStatusMutationOptions(options));
     }
 
-export const getRequestSmsWalletTopUpUrl = () => {
+export const getGetSmsPurchaseUrl = (id: number,) => {
 
 
 
 
-  return `/api/messages/wallet/top-up`
+  return `/api/messages/purchases/${id}`
 }
 
 /**
- * @summary Request an SMS wallet top-up
+ * @summary Get SMS purchase and automatic-send status
  */
-export const requestSmsWalletTopUp = async (smsWalletTopUpInput: SmsWalletTopUpInput, options?: RequestInit): Promise<void> => {
+export const getSmsPurchase = async (id: number, options?: RequestInit): Promise<void> => {
 
-  return customFetch<void>(getRequestSmsWalletTopUpUrl(),
+  return customFetch<void>(getGetSmsPurchaseUrl(id),
   {
     ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(
-      smsWalletTopUpInput,)
+    method: 'GET'
+
+
   }
 );}
 
 
 
 
-export const getRequestSmsWalletTopUpMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestSmsWalletTopUp>>, TError,{data: BodyType<SmsWalletTopUpInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof requestSmsWalletTopUp>>, TError,{data: BodyType<SmsWalletTopUpInput>}, TContext> => {
 
-const mutationKey = ['requestSmsWalletTopUp'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof requestSmsWalletTopUp>>, {data: BodyType<SmsWalletTopUpInput>}> = (props) => {
-          const {data} = props ?? {};
-
-          return  requestSmsWalletTopUp(data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type RequestSmsWalletTopUpMutationResult = NonNullable<Awaited<ReturnType<typeof requestSmsWalletTopUp>>>
-    export type RequestSmsWalletTopUpMutationBody = BodyType<SmsWalletTopUpInput>
-    export type RequestSmsWalletTopUpMutationError = ErrorType<unknown>
-
-    /**
- * @summary Request an SMS wallet top-up
- */
-export const useRequestSmsWalletTopUp = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestSmsWalletTopUp>>, TError,{data: BodyType<SmsWalletTopUpInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
- ): UseMutationResult<
-        Awaited<ReturnType<typeof requestSmsWalletTopUp>>,
-        TError,
-        {data: BodyType<SmsWalletTopUpInput>},
-        TContext
-      > => {
-      return useMutation(getRequestSmsWalletTopUpMutationOptions(options));
+export const getGetSmsPurchaseQueryKey = (id: number,) => {
+    return [
+    `/api/messages/purchases/${id}`
+    ] as const;
     }
+
+
+export const getGetSmsPurchaseQueryOptions = <TData = Awaited<ReturnType<typeof getSmsPurchase>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSmsPurchase>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSmsPurchaseQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSmsPurchase>>> = ({ signal }) => getSmsPurchase(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSmsPurchase>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetSmsPurchaseQueryResult = NonNullable<Awaited<ReturnType<typeof getSmsPurchase>>>
+export type GetSmsPurchaseQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get SMS purchase and automatic-send status
+ */
+
+export function useGetSmsPurchase<TData = Awaited<ReturnType<typeof getSmsPurchase>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSmsPurchase>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetSmsPurchaseQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getReceiveSmsDlrUrl = (token: string,) => {
 

@@ -199,6 +199,14 @@ export const TestPharmacyMpesaResponse = zod.object({
 
 
 /**
+ * @summary Reveal pharmacy M-PESA credentials after password confirmation
+ */
+export const RevealPharmacyMpesaParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+/**
  * @summary Register C2B confirmation and validation callback URLs
  */
 export const RegisterPharmacyMpesaCallbacksParams = zod.object({
@@ -208,6 +216,18 @@ export const RegisterPharmacyMpesaCallbacksParams = zod.object({
 export const RegisterPharmacyMpesaCallbacksResponse = zod.object({
   "success": zod.boolean()
 })
+
+
+/**
+ * @summary Get masked global SMS and SMS billing M-PESA settings
+ */
+export const GetAdminSettingsResponse = zod.record(zod.string(), zod.unknown())
+
+
+/**
+ * @summary Save global SMS and SMS billing M-PESA settings
+ */
+export const UpdateAdminSettingsBody = zod.record(zod.string(), zod.unknown())
 
 
 /**
@@ -912,7 +932,7 @@ export const ListMessagesResponseItem = zod.object({
   "sentCount": zod.number(),
   "deliveredCount": zod.number(),
   "failedCount": zod.number(),
-  "status": zod.enum(['queued', 'processing', 'sent', 'delivered', 'failed', 'partially_failed']),
+  "status": zod.enum(['queued', 'awaiting_payment', 'paid', 'payment_failed', 'processing', 'sent', 'delivered', 'failed', 'partially_failed']),
   "dateFrom": zod.string().nullish(),
   "dateTo": zod.string().nullish(),
   "scheduledAt": zod.string().nullish(),
@@ -930,7 +950,8 @@ export const SendMessageBody = zod.object({
   "content": zod.string(),
   "recipientType": zod.enum(['all', 'this_week', 'range']),
   "dateFrom": zod.string().optional(),
-  "dateTo": zod.string().optional()
+  "dateTo": zod.string().optional(),
+  "paymentPhone": zod.string().optional()
 })
 
 
@@ -954,7 +975,7 @@ export const GetMessageResponse = zod.object({
   "sentCount": zod.number(),
   "deliveredCount": zod.number(),
   "failedCount": zod.number(),
-  "status": zod.enum(['queued', 'processing', 'sent', 'delivered', 'failed', 'partially_failed']),
+  "status": zod.enum(['queued', 'awaiting_payment', 'paid', 'payment_failed', 'processing', 'sent', 'delivered', 'failed', 'partially_failed']),
   "dateFrom": zod.string().nullish(),
   "dateTo": zod.string().nullish(),
   "scheduledAt": zod.string().nullish(),
@@ -967,13 +988,11 @@ export const GetMessageResponse = zod.object({
  * @summary Get SMS wallet, rate, gateway, and sales-contact summary
  */
 export const GetSmsSummaryResponse = zod.object({
-  "balance": zod.number(),
+  "creditBalance": zod.number(),
   "unitRate": zod.number(),
-  "availableUnits": zod.number(),
-  "pendingTopUp": zod.number(),
-  "pendingUnits": zod.number(),
   "salesContacts": zod.number(),
-  "gatewayEnabled": zod.boolean()
+  "gatewayEnabled": zod.boolean(),
+  "billingMpesaEnabled": zod.boolean()
 })
 
 
@@ -1008,19 +1027,14 @@ export const QuoteMessageCampaignResponse = zod.object({
   "segmentCount": zod.number(),
   "unitsPerRecipient": zod.number(),
   "totalUnits": zod.number(),
-  "unitBreakdown": zod.array(zod.object({
-  "unitsPerRecipient": zod.number(),
-  "recipients": zod.number(),
-  "totalUnits": zod.number()
-})),
   "unitRate": zod.number(),
   "amountKes": zod.number(),
-  "walletBalance": zod.number(),
-  "walletShortfall": zod.number(),
-  "pendingTopUp": zod.number(),
-  "pendingUnits": zod.number(),
+  "availableCredit": zod.number(),
+  "creditApplied": zod.number(),
+  "amountDue": zod.number(),
   "gatewayEnabled": zod.boolean(),
-  "canSend": zod.boolean(),
+  "billingMpesaEnabled": zod.boolean(),
+  "canPurchase": zod.boolean(),
   "unsupported": zod.array(zod.string())
 })
 
@@ -1064,10 +1078,10 @@ export const RefreshMessageStatusResponse = zod.object({
 
 
 /**
- * @summary Request an SMS wallet top-up
+ * @summary Get SMS purchase and automatic-send status
  */
-export const RequestSmsWalletTopUpBody = zod.object({
-  "amount": zod.number()
+export const GetSmsPurchaseParams = zod.object({
+  "id": zod.coerce.number()
 })
 
 
@@ -1087,7 +1101,8 @@ export const ReceiveSmsDlrBody = zod.record(zod.string(), zod.unknown())
 export const SendTransactionalHashedSmsBody = zod.object({
   "mobile": zod.string(),
   "message": zod.string(),
-  "title": zod.string().optional()
+  "title": zod.string().optional(),
+  "paymentPhone": zod.string().optional()
 })
 
 

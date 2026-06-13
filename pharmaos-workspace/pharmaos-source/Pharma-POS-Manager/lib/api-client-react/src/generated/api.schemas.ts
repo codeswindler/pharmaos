@@ -541,6 +541,9 @@ export type MessageStatus = typeof MessageStatus[keyof typeof MessageStatus];
 
 export const MessageStatus = {
   queued: 'queued',
+  awaiting_payment: 'awaiting_payment',
+  paid: 'paid',
+  payment_failed: 'payment_failed',
   processing: 'processing',
   sent: 'sent',
   delivered: 'delivered',
@@ -588,6 +591,7 @@ export interface MessageInput {
   recipientType: MessageInputRecipientType;
   dateFrom?: string;
   dateTo?: string;
+  paymentPhone?: string;
 }
 
 export type MessageQuoteInputRecipientType = typeof MessageQuoteInputRecipientType[keyof typeof MessageQuoteInputRecipientType];
@@ -608,12 +612,6 @@ export interface MessageQuoteInput {
   dateTo?: string | null;
 }
 
-export type MessageQuoteUnitBreakdownItem = {
-  unitsPerRecipient: number;
-  recipients: number;
-  totalUnits: number;
-};
-
 export interface MessageQuote {
   recipientType: string;
   recipientCount: number;
@@ -621,26 +619,23 @@ export interface MessageQuote {
   segmentCount: number;
   unitsPerRecipient: number;
   totalUnits: number;
-  unitBreakdown: MessageQuoteUnitBreakdownItem[];
   unitRate: number;
   amountKes: number;
-  walletBalance: number;
-  walletShortfall: number;
-  pendingTopUp: number;
-  pendingUnits: number;
+  availableCredit: number;
+  creditApplied: number;
+  amountDue: number;
   gatewayEnabled: boolean;
-  canSend: boolean;
+  billingMpesaEnabled: boolean;
+  canPurchase: boolean;
   unsupported: string[];
 }
 
 export interface SmsSummary {
-  balance: number;
+  creditBalance: number;
   unitRate: number;
-  availableUnits: number;
-  pendingTopUp: number;
-  pendingUnits: number;
   salesContacts: number;
   gatewayEnabled: boolean;
+  billingMpesaEnabled: boolean;
 }
 
 export interface MessageRecipient {
@@ -666,9 +661,19 @@ export interface MessageRecipient {
   createdAt: string;
 }
 
-export interface SmsWalletTopUpInput {
-  amount: number;
+export interface SmsPurchaseStart {
+  purchaseId: number;
+  messageId: number;
+  status: string;
+  checkoutRequestId?: string;
+  amountDue?: number;
+  creditApplied?: number;
+  message?: string;
 }
+
+export interface PlatformSmsSettings { [key: string]: unknown }
+
+export interface PlatformSmsSettingsInput { [key: string]: unknown }
 
 export interface SmsDlrPayload { [key: string]: unknown }
 
@@ -676,6 +681,7 @@ export interface TransactionalHashedSmsInput {
   mobile: string;
   message: string;
   title?: string;
+  paymentPhone?: string;
 }
 
 export type ListProductsParams = {

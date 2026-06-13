@@ -5,7 +5,6 @@
  * PharmaPOS API specification
  * OpenAPI spec version: 0.1.0
  */
-import type { MessageQuoteUnitBreakdownItem } from './messageQuoteUnitBreakdownItem';
 
 export interface MessageQuote {
   recipientType: string;
@@ -14,14 +13,13 @@ export interface MessageQuote {
   segmentCount: number;
   unitsPerRecipient: number;
   totalUnits: number;
-  unitBreakdown: MessageQuoteUnitBreakdownItem[];
   unitRate: number;
   amountKes: number;
-  walletBalance: number;
-  walletShortfall: number;
-  pendingTopUp: number;
-  pendingUnits: number;
+  availableCredit: number;
+  creditApplied: number;
+  amountDue: number;
   gatewayEnabled: boolean;
-  canSend: boolean;
+  billingMpesaEnabled: boolean;
+  canPurchase: boolean;
   unsupported: string[];
 }

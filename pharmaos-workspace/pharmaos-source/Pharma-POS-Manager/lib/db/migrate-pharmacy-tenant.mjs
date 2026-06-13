@@ -139,5 +139,20 @@ if (
   }
 }
 
+if (await tableExists("sms_wallets") && await tableExists("sms_wallet_transactions")) {
+  await db.query(`
+    UPDATE sms_wallets w
+    SET w.balance = 0
+    WHERE w.balance > 0
+      AND NOT EXISTS (
+        SELECT 1
+        FROM sms_wallet_transactions t
+        WHERE t.pharmacy_id = w.pharmacy_id
+          AND t.amount > 0
+          AND t.type <> 'top_up_request'
+      )
+  `);
+}
+
 await db.end();
 console.log("Pharmacy tenant migration complete");

@@ -45,13 +45,13 @@ router.get("/events", (req, res) => {
   }
 });
 
-router.post("/mpesa/c2b/:token/validation", async (req, res) => {
-  const [config] = await db.select().from(mpesaConfigsTable).where(eq(mpesaConfigsTable.callbackToken, req.params.token));
+router.post(["/c2b/:token/validation", "/mpesa/c2b/:token/validation"], async (req, res) => {
+  const [config] = await db.select().from(mpesaConfigsTable).where(eq(mpesaConfigsTable.callbackToken, String(req.params.token)));
   res.json(config ? { ResultCode: 0, ResultDesc: "Accepted" } : { ResultCode: 1, ResultDesc: "Rejected" });
 });
 
-router.post("/mpesa/c2b/:token/confirmation", async (req, res) => {
-  const [config] = await db.select().from(mpesaConfigsTable).where(eq(mpesaConfigsTable.callbackToken, req.params.token));
+router.post(["/c2b/:token/confirmation", "/mpesa/c2b/:token/confirmation"], async (req, res) => {
+  const [config] = await db.select().from(mpesaConfigsTable).where(eq(mpesaConfigsTable.callbackToken, String(req.params.token)));
   if (!config) return void res.status(404).json({ ResultCode: 1, ResultDesc: "Unknown pharmacy" });
   const referenceCode = String(req.body.TransID ?? "");
   const values = {
@@ -66,8 +66,8 @@ router.post("/mpesa/c2b/:token/confirmation", async (req, res) => {
   res.json({ ResultCode: 0, ResultDesc: "Accepted" });
 });
 
-router.post("/mpesa/stk/:token/callback", async (req, res) => {
-  const [config] = await db.select().from(mpesaConfigsTable).where(eq(mpesaConfigsTable.callbackToken, req.params.token));
+router.post(["/stk/:token/callback", "/mpesa/stk/:token/callback"], async (req, res) => {
+  const [config] = await db.select().from(mpesaConfigsTable).where(eq(mpesaConfigsTable.callbackToken, String(req.params.token)));
   if (!config) return void res.status(404).json({ ResultCode: 1, ResultDesc: "Unknown pharmacy" });
   const callback = req.body?.Body?.stkCallback;
   if (callback) {
@@ -105,7 +105,7 @@ router.post("/mpesa/initiate", async (req, res) => {
     body: JSON.stringify({
       BusinessShortCode: config.shortcode, Password: password, Timestamp: timestamp, TransactionType: config.transactionType,
       Amount: Math.ceil(Number(amount)), PartyA: normalizePhone(phone), PartyB: config.shortcode, PhoneNumber: normalizePhone(phone),
-      CallBackURL: `${process.env.PUBLIC_API_URL}/api/payments/mpesa/stk/${config.callbackToken}/callback`,
+      CallBackURL: `${process.env.PUBLIC_API_URL}/api/payments/stk/${config.callbackToken}/callback`,
       AccountReference: `Checkout-${checkout.id}`, TransactionDesc: "PharmaOS checkout",
     }),
   });

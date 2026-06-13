@@ -13,4 +13,5 @@ export interface MessageInput {
   recipientType: MessageInputRecipientType;
   dateFrom?: string;
   dateTo?: string;
+  paymentPhone?: string;
 }

@@ -1,5 +1,6 @@
 import app from "./app";
 import { logger } from "./lib/logger";
+import { resumePaidSmsPurchases } from "./lib/sms-campaign-service";
 
 const rawPort = process.env["PORT"];
 
@@ -18,6 +19,7 @@ if (Number.isNaN(port) || port <= 0) {
 
 const server = app.listen(port, host, () => {
   logger.info({ host, port }, "Server listening");
+  void resumePaidSmsPurchases().catch(err => logger.error({ err }, "Unable to resume paid SMS purchases"));
 });
 
 server.on("error", (err) => {

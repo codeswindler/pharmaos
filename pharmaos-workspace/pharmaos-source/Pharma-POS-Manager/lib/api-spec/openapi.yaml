@@ -181,6 +181,21 @@ paths:
               schema:
                 $ref: "#/components/schemas/SuccessResponse"
 
+  /admin/pharmacies/{id}/mpesa/reveal:
+    post:
+      operationId: revealPharmacyMpesa
+      tags: [admin]
+      summary: Reveal pharmacy M-PESA credentials after password confirmation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Revealed credentials
+
   /admin/pharmacies/{id}/mpesa/register-callbacks:
     post:
       operationId: registerPharmacyMpesaCallbacks
@@ -199,6 +214,59 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SuccessResponse"
+
+  /admin/settings:
+    get:
+      operationId: getAdminSettings
+      tags: [admin]
+      summary: Get masked global SMS and SMS billing M-PESA settings
+      responses:
+        "200":
+          description: Platform settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlatformSmsSettings"
+    put:
+      operationId: updateAdminSettings
+      tags: [admin]
+      summary: Save global SMS and SMS billing M-PESA settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlatformSmsSettingsInput"
+      responses:
+        "200":
+          description: Settings saved
+
+  /admin/settings/reveal:
+    post:
+      operationId: revealAdminSettingsSecrets
+      tags: [admin]
+      summary: Reveal encrypted platform credentials after password confirmation
+      responses:
+        "200":
+          description: Revealed credentials
+
+  /admin/settings/test-mpesa:
+    post:
+      operationId: testSmsBillingMpesa
+      tags: [admin]
+      summary: Test platform SMS billing M-PESA credentials
+      responses:
+        "200":
+          description: Credentials verified
+
+  /admin/settings/test-sms:
+    post:
+      operationId: testPlatformSmsGateway
+      tags: [admin]
+      summary: Send a platform SMS gateway test
+      responses:
+        "200":
+          description: Test message accepted
 
   /admin/stats:
     get:
@@ -616,7 +684,7 @@ paths:
               schema:
                 type: string
 
-  /payments/mpesa/c2b/{token}/validation:
+  /payments/c2b/{token}/validation:
     post:
       operationId: validateC2bPayment
       tags: [payments]
@@ -636,7 +704,7 @@ paths:
         "200":
           description: Validation response
 
-  /payments/mpesa/c2b/{token}/confirmation:
+  /payments/c2b/{token}/confirmation:
     post:
       operationId: confirmC2bPayment
       tags: [payments]
@@ -656,7 +724,7 @@ paths:
         "200":
           description: Confirmation accepted
 
-  /payments/mpesa/stk/{token}/callback:
+  /payments/stk/{token}/callback:
     post:
       operationId: receiveStkCallback
       tags: [payments]
@@ -849,11 +917,11 @@ paths:
               $ref: "#/components/schemas/MessageInput"
       responses:
         "201":
-          description: Message sent
+          description: Campaign purchase created
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Message"
+                $ref: "#/components/schemas/SmsPurchaseStart"
 
   /messages/{id}:
     get:
@@ -978,20 +1046,20 @@ paths:
               schema:
                 $ref: "#/components/schemas/SuccessResponse"
 
-  /messages/wallet/top-up:
-    post:
-      operationId: requestSmsWalletTopUp
+  /messages/purchases/{id}:
+    get:
+      operationId: getSmsPurchase
       tags: [messages]
-      summary: Request an SMS wallet top-up
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/SmsWalletTopUpInput"
+      summary: Get SMS purchase and automatic-send status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
       responses:
-        "202":
-          description: Top-up requested
+        "200":
+          description: SMS purchase status
 
   /messages/dlr/{token}:
     post:
@@ -1754,7 +1822,7 @@ components:
           type: integer
         status:
           type: string
-          enum: [queued, processing, sent, delivered, failed, partially_failed]
+          enum: [queued, awaiting_payment, paid, payment_failed, processing, sent, delivered, failed, partially_failed]
         dateFrom:
           type: ["string", "null"]
         dateTo:
@@ -1781,6 +1849,8 @@ components:
           type: string
         dateTo:
           type: string
+        paymentPhone:
+          type: string
 
     MessageQuoteInput:
       type: object
@@ -1798,7 +1868,7 @@ components:
 
     MessageQuote:
       type: object
-      required: [recipientType, recipientCount, characterCount, segmentCount, unitsPerRecipient, totalUnits, unitBreakdown, unitRate, amountKes, walletBalance, walletShortfall, pendingTopUp, pendingUnits, gatewayEnabled, canSend, unsupported]
+      required: [recipientType, recipientCount, characterCount, segmentCount, unitsPerRecipient, totalUnits, unitRate, amountKes, availableCredit, creditApplied, amountDue, gatewayEnabled, billingMpesaEnabled, canPurchase, unsupported]
       properties:
         recipientType:
           type: string
@@ -1812,33 +1882,21 @@ components:
           type: integer
         totalUnits:
           type: integer
-        unitBreakdown:
-          type: array
-          items:
-            type: object
-            required: [unitsPerRecipient, recipients, totalUnits]
-            properties:
-              unitsPerRecipient:
-                type: integer
-              recipients:
-                type: integer
-              totalUnits:
-                type: integer
         unitRate:
           type: number
         amountKes:
           type: number
-        walletBalance:
+        availableCredit:
           type: number
-        walletShortfall:
+        creditApplied:
           type: number
-        pendingTopUp:
+        amountDue:
           type: number
-        pendingUnits:
-          type: integer
         gatewayEnabled:
           type: boolean
-        canSend:
+        billingMpesaEnabled:
+          type: boolean
+        canPurchase:
           type: boolean
         unsupported:
           type: array
@@ -1847,21 +1905,17 @@ components:
 
     SmsSummary:
       type: object
-      required: [balance, unitRate, availableUnits, pendingTopUp, pendingUnits, salesContacts, gatewayEnabled]
+      required: [creditBalance, unitRate, salesContacts, gatewayEnabled, billingMpesaEnabled]
       properties:
-        balance:
+        creditBalance:
           type: number
         unitRate:
           type: number
-        availableUnits:
-          type: integer
-        pendingTopUp:
-          type: number
-        pendingUnits:
-          type: integer
         salesContacts:
           type: integer
         gatewayEnabled:
+          type: boolean
+        billingMpesaEnabled:
           type: boolean
 
     MessageRecipient:
@@ -1897,12 +1951,32 @@ components:
         createdAt:
           type: string
 
-    SmsWalletTopUpInput:
+    SmsPurchaseStart:
       type: object
-      required: [amount]
+      required: [purchaseId, messageId, status]
       properties:
-        amount:
+        purchaseId:
+          type: integer
+        messageId:
+          type: integer
+        status:
+          type: string
+        checkoutRequestId:
+          type: string
+        amountDue:
           type: number
+        creditApplied:
+          type: number
+        message:
+          type: string
+
+    PlatformSmsSettings:
+      type: object
+      additionalProperties: true
+
+    PlatformSmsSettingsInput:
+      type: object
+      additionalProperties: true
 
     SmsDlrPayload:
       type: object
@@ -1917,4 +1991,6 @@ components:
         message:
           type: string
         title:
+          type: string
+        paymentPhone:
           type: string

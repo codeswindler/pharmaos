@@ -326,14 +326,9 @@ try {
 
   await db.query(`
     INSERT INTO sms_wallets (pharmacy_id, balance)
-    VALUES (?, 500)
+    VALUES (?, 0)
     ON DUPLICATE KEY UPDATE balance = VALUES(balance)
   `, [pharmacy.id]);
-  await db.query(`
-    INSERT INTO sms_configs (pharmacy_id, unit_rate, callback_token, enabled)
-    VALUES (?, 1, ?, 0)
-    ON DUPLICATE KEY UPDATE unit_rate = VALUES(unit_rate)
-  `, [pharmacy.id, `demo-sms-${pharmacy.id}`]);
 
   await db.commit();
   console.log(`Demo data ready for ${pharmacyName}: ${products.length} products, ${salePlans.length} completed sales, ${contactsByPhone.length} SMS sales contacts`);

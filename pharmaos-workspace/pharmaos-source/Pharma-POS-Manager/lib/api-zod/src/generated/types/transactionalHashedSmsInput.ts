@@ -10,4 +10,5 @@ export interface TransactionalHashedSmsInput {
   mobile: string;
   message: string;
   title?: string;
+  paymentPhone?: string;
 }

@@ -1,13 +1,23 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import crypto from "node:crypto";
-import { db, pharmaciesTable, usersTable, mpesaConfigsTable, smsConfigsTable, smsWalletsTable, smsWalletTransactionsTable, messagesTable, messageRecipientsTable } from "@workspace/db";
-import { and, count, desc, eq, sql } from "drizzle-orm";
+import { credentialRevealAuditsTable, db, pharmaciesTable, usersTable, mpesaConfigsTable, smsWalletsTable, messagesTable, messageRecipientsTable } from "@workspace/db";
+import { count, desc, eq } from "drizzle-orm";
 import { requireSuperAdmin, type AuthenticatedRequest } from "../middleware/auth";
 import { decryptSecret, encryptSecret, maskSecret, normalizePhone } from "../lib/security";
+import { logger } from "../lib/logger";
 
 const router = Router();
 router.use(requireSuperAdmin);
+
+const readableProviderError = (raw: string, fallback: string) => {
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed.errorMessage ?? parsed.responseDescription ?? parsed["response-description"] ?? parsed.error ?? fallback;
+  } catch {
+    return raw.length < 300 ? raw : fallback;
+  }
+};
 
 const formatConfig = (config: typeof mpesaConfigsTable.$inferSelect | undefined) => config ? ({
   environment: config.environment, shortcode: config.shortcode, transactionType: config.transactionType,
@@ -19,27 +29,13 @@ const formatConfig = (config: typeof mpesaConfigsTable.$inferSelect | undefined)
   callbacksRegisteredAt: config.callbacksRegisteredAt?.toISOString() ?? null,
 }) : null;
 
-const formatSmsConfig = (config: typeof smsConfigsTable.$inferSelect | undefined) => config ? ({
-  baseUrl: config.baseUrl,
-  apiKey: config.apiKeyEncrypted ? maskSecret(decryptSecret(config.apiKeyEncrypted)) : null,
-  partnerId: config.partnerIdEncrypted ? maskSecret(decryptSecret(config.partnerIdEncrypted)) : null,
-  shortcode: config.shortcode,
-  sendEndpointPath: config.sendEndpointPath,
-  hashedEndpointPath: config.hashedEndpointPath,
-  statusEndpointPath: config.statusEndpointPath,
-  unitRate: Number(config.unitRate),
-  enabled: Boolean(config.enabled),
-}) : null;
-
 router.get("/pharmacies", async (_req, res) => {
   const pharmacies = await db.select().from(pharmaciesTable).orderBy(desc(pharmaciesTable.createdAt));
   const result = await Promise.all(pharmacies.map(async pharmacy => {
     const [{ value }] = await db.select({ value: count() }).from(usersTable).where(eq(usersTable.pharmacyId, pharmacy.id));
     const [config] = await db.select().from(mpesaConfigsTable).where(eq(mpesaConfigsTable.pharmacyId, pharmacy.id));
-    const [sms] = await db.select().from(smsConfigsTable).where(eq(smsConfigsTable.pharmacyId, pharmacy.id));
     const [wallet] = await db.select().from(smsWalletsTable).where(eq(smsWalletsTable.pharmacyId, pharmacy.id));
-    const requests = await db.select().from(smsWalletTransactionsTable).where(and(eq(smsWalletTransactionsTable.pharmacyId, pharmacy.id), eq(smsWalletTransactionsTable.type, "top_up_request")));
-    return { ...pharmacy, userCount: Number(value), mpesa: formatConfig(config), sms: formatSmsConfig(sms), smsWalletBalance: Number(wallet?.balance ?? 0), pendingSmsTopUp: requests.reduce((sum, row) => sum + Number(row.amount), 0) };
+    return { ...pharmacy, userCount: Number(value), mpesa: formatConfig(config), smsWalletBalance: Number(wallet?.balance ?? 0) };
   }));
   res.json(result);
 });
@@ -104,78 +100,62 @@ async function getToken(pharmacyId: number) {
   const base = config.environment === "production" ? "https://api.safaricom.co.ke" : "https://sandbox.safaricom.co.ke";
   const auth = Buffer.from(`${decryptSecret(config.consumerKeyEncrypted)}:${decryptSecret(config.consumerSecretEncrypted)}`).toString("base64");
   const response = await fetch(`${base}/oauth/v1/generate?grant_type=client_credentials`, { headers: { Authorization: `Basic ${auth}` } });
-  if (!response.ok) throw new Error(await response.text());
+  if (!response.ok) throw new Error(readableProviderError(await response.text(), "Safaricom credential verification failed"));
   return { config, base, token: ((await response.json()) as { access_token: string }).access_token };
 }
 
 router.post("/pharmacies/:id/mpesa/test", async (req, res) => {
   const pharmacyId = Number(req.params.id);
-  await getToken(pharmacyId);
-  await db.update(mpesaConfigsTable).set({ credentialsVerifiedAt: new Date() }).where(eq(mpesaConfigsTable.pharmacyId, pharmacyId));
-  res.json({ success: true });
+  try {
+    await getToken(pharmacyId);
+    await db.update(mpesaConfigsTable).set({ credentialsVerifiedAt: new Date() }).where(eq(mpesaConfigsTable.pharmacyId, pharmacyId));
+    res.json({ success: true, message: "Pharmacy M-PESA credentials verified" });
+  } catch (error: any) {
+    res.status(502).json({ error: error.message || "Unable to verify pharmacy M-PESA credentials" });
+  }
 });
 
 router.post("/pharmacies/:id/mpesa/register-callbacks", async (req, res) => {
   const pharmacyId = Number(req.params.id);
-  const { config, base, token } = await getToken(pharmacyId);
+  let auth;
+  try { auth = await getToken(pharmacyId); }
+  catch (error: any) { return void res.status(502).json({ error: error.message || "Unable to authenticate with Safaricom" }); }
+  const { config, base, token } = auth;
   const publicUrl = process.env.PUBLIC_API_URL;
   if (!publicUrl) return void res.status(400).json({ error: "PUBLIC_API_URL must be configured" });
   const response = await fetch(`${base}/mpesa/c2b/v2/registerurl`, {
     method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       ShortCode: config.shortcode, ResponseType: "Completed",
-      ConfirmationURL: `${publicUrl}/api/payments/mpesa/c2b/${config.callbackToken}/confirmation`,
-      ValidationURL: `${publicUrl}/api/payments/mpesa/c2b/${config.callbackToken}/validation`,
+      ConfirmationURL: `${publicUrl}/api/payments/c2b/${config.callbackToken}/confirmation`,
+      ValidationURL: `${publicUrl}/api/payments/c2b/${config.callbackToken}/validation`,
     }),
   });
   if (!response.ok) {
+    const providerError = await response.text();
+    logger.error({ pharmacyId, providerError }, "C2B callback registration failed");
     await db.update(mpesaConfigsTable).set({ registrationStatus: "failed" }).where(eq(mpesaConfigsTable.pharmacyId, pharmacyId));
-    return void res.status(502).json({ error: await response.text() });
+    return void res.status(502).json({ error: readableProviderError(providerError, "Safaricom rejected the callback registration") });
   }
   await db.update(mpesaConfigsTable).set({ callbacksRegisteredAt: new Date(), registrationStatus: "registered" }).where(eq(mpesaConfigsTable.pharmacyId, pharmacyId));
-  res.json({ success: true, response: await response.json() });
+  res.json({ success: true, message: "C2B callbacks registered", response: await response.json() });
 });
 
-router.put("/pharmacies/:id/sms", async (req, res) => {
-  const pharmacyId = Number(req.params.id);
-  if (!Number.isInteger(pharmacyId)) return void res.status(400).json({ error: "Invalid pharmacy id" });
-  const {
-    baseUrl = "", apiKey, partnerId, shortcode = "", sendEndpointPath = "/api/services/sendsms",
-    hashedEndpointPath = "/api/services/sendotp", statusEndpointPath = "/api/services/getdlr",
-    unitRate = 1, enabled = false,
-  } = req.body;
-  const [existing] = await db.select().from(smsConfigsTable).where(eq(smsConfigsTable.pharmacyId, pharmacyId));
-  if (Number(unitRate) <= 0) return void res.status(400).json({ error: "SMS unit rate must be greater than zero" });
-  if (enabled && (!baseUrl || !shortcode || (!existing && (!apiKey || !partnerId)))) {
-    return void res.status(400).json({ error: "Base URL, shortcode, API key, and partner ID are required before enabling SMS" });
+router.post("/pharmacies/:id/mpesa/reveal", async (req, res) => {
+  const auth = req as unknown as AuthenticatedRequest;
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, auth.user.userId));
+  if (!user || !(await bcrypt.compare(String(req.body.password ?? ""), user.passwordHash))) {
+    return void res.status(401).json({ error: "Password confirmation failed" });
   }
-  const values = {
-    pharmacyId, baseUrl, shortcode, sendEndpointPath, hashedEndpointPath, statusEndpointPath,
-    unitRate: String(unitRate), enabled: enabled ? 1 : 0,
-    apiKeyEncrypted: apiKey ? encryptSecret(apiKey) : existing?.apiKeyEncrypted ?? null,
-    partnerIdEncrypted: partnerId ? encryptSecret(partnerId) : existing?.partnerIdEncrypted ?? null,
-    callbackToken: existing?.callbackToken ?? crypto.randomBytes(24).toString("hex"),
-  };
-  await db.insert(smsConfigsTable).values(values).onDuplicateKeyUpdate({ set: values });
-  await db.insert(smsWalletsTable).values({ pharmacyId }).onDuplicateKeyUpdate({ set: { pharmacyId } });
-  const [saved] = await db.select().from(smsConfigsTable).where(eq(smsConfigsTable.pharmacyId, pharmacyId));
-  res.json({ success: true, config: formatSmsConfig(saved), callbackUrl: `${process.env.PUBLIC_API_URL ?? ""}/api/messages/dlr/${saved.callbackToken}` });
-});
-
-router.post("/pharmacies/:id/sms-wallet/credit", async (req, res) => {
   const pharmacyId = Number(req.params.id);
-  if (!Number.isInteger(pharmacyId)) return void res.status(400).json({ error: "Invalid pharmacy id" });
-  const amount = Number(req.body.amount);
-  if (!Number.isFinite(amount) || amount <= 0) return void res.status(400).json({ error: "Enter a valid credit amount" });
-  await db.insert(smsWalletsTable).values({ pharmacyId }).onDuplicateKeyUpdate({ set: { pharmacyId } });
-  await db.update(smsWalletsTable).set({ balance: sql`${smsWalletsTable.balance} + ${amount}` }).where(eq(smsWalletsTable.pharmacyId, pharmacyId));
-  const [wallet] = await db.select().from(smsWalletsTable).where(eq(smsWalletsTable.pharmacyId, pharmacyId));
-  await db.insert(smsWalletTransactionsTable).values({
-    pharmacyId, createdBy: (req as unknown as AuthenticatedRequest).user.userId, type: "admin_credit",
-    amount: String(amount), balanceAfter: wallet.balance, reference: String(req.body.reference ?? "Admin wallet credit"),
+  const [config] = await db.select().from(mpesaConfigsTable).where(eq(mpesaConfigsTable.pharmacyId, pharmacyId));
+  if (!config) return void res.status(404).json({ error: "M-PESA configuration not found" });
+  await db.insert(credentialRevealAuditsTable).values({ userId: auth.user.userId, scope: "pharmacy_mpesa", targetId: pharmacyId });
+  res.json({
+    consumerKey: decryptSecret(config.consumerKeyEncrypted),
+    consumerSecret: decryptSecret(config.consumerSecretEncrypted),
+    passkey: config.passkeyEncrypted ? decryptSecret(config.passkeyEncrypted) : "",
   });
-  await db.update(smsWalletTransactionsTable).set({ type: "top_up_approved" }).where(and(eq(smsWalletTransactionsTable.pharmacyId, pharmacyId), eq(smsWalletTransactionsTable.type, "top_up_request")));
-  res.json({ success: true, balance: Number(wallet.balance) });
 });
 
 router.get("/pharmacies/:id/messages", async (req, res) => {

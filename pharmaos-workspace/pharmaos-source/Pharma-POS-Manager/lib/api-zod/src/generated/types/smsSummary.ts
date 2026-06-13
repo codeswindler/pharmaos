@@ -7,11 +7,9 @@
  */
 
 export interface SmsSummary {
-  balance: number;
+  creditBalance: number;
   unitRate: number;
-  availableUnits: number;
-  pendingTopUp: number;
-  pendingUnits: number;
   salesContacts: number;
   gatewayEnabled: boolean;
+  billingMpesaEnabled: boolean;
 }
