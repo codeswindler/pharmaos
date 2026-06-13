@@ -2,11 +2,13 @@ import type { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { PharmaPOSLogo } from "./PharmaPOSLogo";
-import { LayoutDashboard, Building2, LogOut, Settings, ShieldCheck } from "lucide-react";
+import { LayoutDashboard, Building2, LogOut, Settings, ShieldCheck, SlidersHorizontal, Users } from "lucide-react";
 
 const links = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
   { href: "/admin/pharmacies", label: "Pharmacies", icon: Building2, exact: false },
+  { href: "/admin/users", label: "Users", icon: Users, exact: false },
+  { href: "/admin/modules", label: "Modules", icon: SlidersHorizontal, exact: false },
   { href: "/admin/settings", label: "Settings", icon: Settings, exact: false },
 ];
 

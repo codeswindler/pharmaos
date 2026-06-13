@@ -6,6 +6,7 @@ import { count, desc, eq } from "drizzle-orm";
 import { requireSuperAdmin, type AuthenticatedRequest } from "../middleware/auth";
 import { decryptSecret, encryptSecret, maskSecret, normalizePhone } from "../lib/security";
 import { logger } from "../lib/logger";
+import { DEFAULT_MODULE_KEYS, PHARMACY_MODULES, getEnabledModules, setEnabledModules } from "../lib/modules";
 
 const router = Router();
 router.use(requireSuperAdmin);
@@ -45,13 +46,74 @@ router.get("/pharmacies", async (_req, res) => {
       const [{ value }] = await db.select({ value: count() }).from(usersTable).where(eq(usersTable.pharmacyId, pharmacy.id));
       const [config] = await db.select().from(mpesaConfigsTable).where(eq(mpesaConfigsTable.pharmacyId, pharmacy.id));
       const [wallet] = await db.select().from(smsWalletsTable).where(eq(smsWalletsTable.pharmacyId, pharmacy.id));
-      return { ...pharmacy, userCount: Number(value), mpesa: formatConfig(config), smsWalletBalance: Number(wallet?.balance ?? 0) };
+      return { ...pharmacy, userCount: Number(value), mpesa: formatConfig(config), smsWalletBalance: Number(wallet?.balance ?? 0), modules: await getEnabledModules(pharmacy.id) };
     }));
     res.json(result);
   } catch (error) {
     logger.error({ err: error }, "Unable to list pharmacies");
     res.status(500).json({ error: "Unable to load pharmacies. Check the PharmaOS server logs for the exact database or credential issue." });
   }
+});
+
+router.get("/users", async (_req, res) => {
+  const users = await db.select().from(usersTable).orderBy(desc(usersTable.createdAt));
+  const pharmacies = await db.select().from(pharmaciesTable);
+  const pharmacyById = new Map(pharmacies.map(pharmacy => [pharmacy.id, pharmacy]));
+  res.json(users.map(({ passwordHash: _passwordHash, ...user }) => ({
+    ...user,
+    pharmacy: user.pharmacyId ? pharmacyById.get(user.pharmacyId) ?? null : null,
+  })));
+});
+
+router.post("/users", async (req, res) => {
+  const { name, email, phone, password, role = "cashier", pharmacyId } = req.body;
+  if (!name || !email || !phone || !password) return void res.status(400).json({ error: "Name, email, phone, and password are required" });
+  if (!["super_admin", "pharmacy_owner", "manager", "cashier"].includes(role)) return void res.status(400).json({ error: "Invalid role" });
+  if (role !== "super_admin" && !Number(pharmacyId)) return void res.status(400).json({ error: "Choose a pharmacy for pharmacy users" });
+  const [{ id }] = await db.insert(usersTable).values({
+    name,
+    email: String(email).toLowerCase(),
+    phone: normalizePhone(phone),
+    passwordHash: await bcrypt.hash(String(password), 12),
+    role,
+    pharmacyId: role === "super_admin" ? null : Number(pharmacyId),
+    isActive: true,
+  }).$returningId();
+  res.status(201).json({ id });
+});
+
+router.patch("/users/:id", async (req, res) => {
+  const id = Number(req.params.id);
+  const { name, email, phone, password, role, pharmacyId, isActive } = req.body;
+  if (role !== undefined && !["super_admin", "pharmacy_owner", "manager", "cashier"].includes(role)) return void res.status(400).json({ error: "Invalid role" });
+  const update: Record<string, unknown> = {
+    ...(name !== undefined && { name }),
+    ...(email !== undefined && { email: String(email).toLowerCase() }),
+    ...(phone !== undefined && { phone: normalizePhone(phone) }),
+    ...(role !== undefined && { role }),
+    ...(pharmacyId !== undefined && { pharmacyId: role === "super_admin" ? null : Number(pharmacyId) || null }),
+    ...(isActive !== undefined && { isActive: Boolean(isActive) }),
+  };
+  if (password) update.passwordHash = await bcrypt.hash(String(password), 12);
+  await db.update(usersTable).set(update).where(eq(usersTable.id, id));
+  res.json({ success: true });
+});
+
+router.get("/modules", async (_req, res) => {
+  const pharmacies = await db.select().from(pharmaciesTable).orderBy(desc(pharmaciesTable.createdAt));
+  res.json({
+    modules: PHARMACY_MODULES,
+    pharmacies: await Promise.all(pharmacies.map(async pharmacy => ({
+      ...pharmacy,
+      modules: await getEnabledModules(pharmacy.id),
+    }))),
+  });
+});
+
+router.put("/pharmacies/:id/modules", async (req, res) => {
+  const pharmacyId = Number(req.params.id);
+  const moduleKeys = Array.isArray(req.body.modules) ? req.body.modules.map(String) : DEFAULT_MODULE_KEYS;
+  res.json({ modules: await setEnabledModules(pharmacyId, moduleKeys) });
 });
 
 router.post("/pharmacies", async (req, res) => {

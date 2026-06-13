@@ -4,6 +4,7 @@ import { db, usersTable, pharmaciesTable } from "@workspace/db";
 import { eq, or } from "drizzle-orm";
 import { signToken, requireAuth, type AuthenticatedRequest, type UserRole } from "../middleware/auth";
 import { normalizePhone } from "../lib/security";
+import { getEnabledModules } from "../lib/modules";
 
 const router = Router();
 
@@ -28,7 +29,7 @@ router.post("/login", async (req, res) => {
   const pharmacy = user.pharmacyId
     ? (await db.select().from(pharmaciesTable).where(eq(pharmaciesTable.id, user.pharmacyId)).limit(1))[0] ?? null
     : null;
-  res.json({ token, user: publicUser(user), pharmacy });
+  res.json({ token, user: publicUser(user), pharmacy, modules: await getEnabledModules(user.pharmacyId) });
 });
 
 router.get("/me", requireAuth, async (req, res) => {
@@ -38,7 +39,7 @@ router.get("/me", requireAuth, async (req, res) => {
   const pharmacy = user.pharmacyId
     ? (await db.select().from(pharmaciesTable).where(eq(pharmaciesTable.id, user.pharmacyId)).limit(1))[0] ?? null
     : null;
-  res.json({ user: publicUser(user), pharmacy });
+  res.json({ user: publicUser(user), pharmacy, modules: await getEnabledModules(user.pharmacyId) });
 });
 
 export default router;

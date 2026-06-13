@@ -14,17 +14,18 @@ import { useAuth } from "@/contexts/AuthContext";
 
 export function Sidebar() {
   const [location] = useLocation();
-  const { user, logout } = useAuth();
+  const { user, modules, logout } = useAuth();
+  const enabled = new Set(modules.length ? modules : ["dashboard", "checkout", "products", "inventory", "sales", "staff", "messages"]);
 
   const links = [
-    { href: "/", label: "Dashboard", icon: LayoutDashboard },
-    { href: "/checkout", label: "Checkout", icon: ShoppingCart },
-    { href: "/products", label: "Products", icon: Package },
-    { href: "/inventory", label: "Inventory", icon: Archive },
-    { href: "/sales", label: "Sales", icon: FileText },
-    ...(["pharmacy_owner", "manager"].includes(user?.role ?? "") ? [{ href: "/staff", label: "Staff", icon: Users }] : []),
-    { href: "/messages", label: "Messages", icon: MessageSquare },
-  ];
+    { key: "dashboard", href: "/", label: "Dashboard", icon: LayoutDashboard },
+    { key: "checkout", href: "/checkout", label: "Checkout", icon: ShoppingCart },
+    { key: "products", href: "/products", label: "Products", icon: Package },
+    { key: "inventory", href: "/inventory", label: "Inventory", icon: Archive },
+    { key: "sales", href: "/sales", label: "Sales", icon: FileText },
+    ...(["pharmacy_owner", "manager"].includes(user?.role ?? "") ? [{ key: "staff", href: "/staff", label: "Staff", icon: Users }] : []),
+    { key: "messages", href: "/messages", label: "Messages", icon: MessageSquare },
+  ].filter(link => enabled.has(link.key));
 
   return (
     <div className="sidebar-root w-64 flex flex-col h-full hidden md:flex">

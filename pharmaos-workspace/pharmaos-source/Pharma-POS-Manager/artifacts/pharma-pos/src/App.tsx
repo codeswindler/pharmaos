@@ -22,6 +22,8 @@ import PharmaciesList from "@/pages/admin/pharmacies";
 import PharmacyForm from "@/pages/admin/pharmacy-form";
 import SmsAudit from "@/pages/admin/sms-audit";
 import AdminSettings from "@/pages/admin/settings";
+import AdminUsers from "@/pages/admin/users";
+import AdminModules from "@/pages/admin/modules";
 
 const queryClient = new QueryClient();
 
@@ -55,6 +57,8 @@ function Router() {
         <Route path="/admin/pharmacies/new" component={() => <AdminLayout><PharmacyForm /></AdminLayout>} />
         <Route path="/admin/pharmacies/:id/edit" component={() => <AdminLayout><PharmacyForm /></AdminLayout>} />
         <Route path="/admin/pharmacies/:id/messages" component={() => <AdminLayout><SmsAudit /></AdminLayout>} />
+        <Route path="/admin/users" component={() => <AdminLayout><AdminUsers /></AdminLayout>} />
+        <Route path="/admin/modules" component={() => <AdminLayout><AdminModules /></AdminLayout>} />
         <Route path="/admin/settings" component={() => <AdminLayout><AdminSettings /></AdminLayout>} />
         <Route component={() => { navigate("/admin"); return null; }} />
       </Switch>

@@ -7,3 +7,4 @@ export * from "./sms";
 export * from "./legacy-transactions";
 export * from "./checkouts";
 export * from "./mpesa-configs";
+export * from "./modules";

@@ -23,6 +23,7 @@ export interface AuthPharmacy {
 interface AuthState {
   user: AuthUser | null;
   pharmacy: AuthPharmacy | null;
+  modules: string[];
   token: string | null;
   loading: boolean;
 }
@@ -35,7 +36,7 @@ interface AuthContextType extends AuthState {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<AuthState>({ user: null, pharmacy: null, token: null, loading: true });
+  const [state, setState] = useState<AuthState>({ user: null, pharmacy: null, modules: [], token: null, loading: true });
 
   useEffect(() => {
     setAuthTokenGetter(() => localStorage.getItem("pharmaos_token"));
@@ -43,8 +44,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!token) { setState(s => ({ ...s, loading: false })); return; }
     fetch(`${API_BASE}/auth/me`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.ok ? r.json() : Promise.reject())
-      .then(({ user, pharmacy }) => setState({ user, pharmacy, token, loading: false }))
-      .catch(() => { localStorage.removeItem("pharmaos_token"); setState({ user: null, pharmacy: null, token: null, loading: false }); });
+      .then(({ user, pharmacy, modules }) => setState({ user, pharmacy, modules: modules ?? [], token, loading: false }))
+      .catch(() => { localStorage.removeItem("pharmaos_token"); setState({ user: null, pharmacy: null, modules: [], token: null, loading: false }); });
   }, []);
 
   const login = async (identifier: string, password: string) => {
@@ -57,15 +58,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const err = await res.json().catch(() => ({}));
       throw new Error((err as any).error || "Login failed");
     }
-    const { token, user, pharmacy } = await res.json();
+    const { token, user, pharmacy, modules } = await res.json();
     localStorage.setItem("pharmaos_token", token);
-    setState({ user, pharmacy, token, loading: false });
+    setState({ user, pharmacy, modules: modules ?? [], token, loading: false });
     return user;
   };
 
   const logout = () => {
     localStorage.removeItem("pharmaos_token");
-    setState({ user: null, pharmacy: null, token: null, loading: false });
+    setState({ user: null, pharmacy: null, modules: [], token: null, loading: false });
   };
 
   return <AuthContext.Provider value={{ ...state, login, logout }}>{children}</AuthContext.Provider>;

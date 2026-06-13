@@ -13,6 +13,15 @@ const formatPayment = (p: typeof paymentsTable.$inferSelect) => ({
   ...p, amount: Number(p.amount), appliedAmount: Number(p.appliedAmount), changeAmount: Number(p.changeAmount),
 });
 
+const safePayload = (body: unknown) => JSON.stringify(body);
+const callbackPhone = (value: unknown) => {
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+  const digits = raw.replace(/\D/g, "");
+  if (digits.length >= 9 && digits.length <= 15) return normalizePhone(raw);
+  return raw.slice(0, 128);
+};
+
 async function configByPharmacy(pharmacyId: number) {
   const [config] = await db.select().from(mpesaConfigsTable).where(and(eq(mpesaConfigsTable.pharmacyId, pharmacyId), eq(mpesaConfigsTable.enabled, true)));
   if (!config) throw new Error("M-PESA is not enabled for this pharmacy");
@@ -57,8 +66,8 @@ router.post(["/c2b/:token/confirmation", "/mpesa/c2b/:token/confirmation"], asyn
   const values = {
     pharmacyId: config.pharmacyId, method: "mpesa", amount: String(req.body.TransAmount ?? 0),
     status: "unmatched", source: "c2b", referenceCode,
-    payerPhone: normalizePhone(String(req.body.MSISDN ?? "")), payerName: String(req.body.FirstName ?? "").trim() || null,
-    rawPayload: JSON.stringify(req.body).slice(0, 4096), receivedAt: new Date(),
+    payerPhone: callbackPhone(req.body.MSISDN), payerName: String(req.body.FirstName ?? "").trim() || null,
+    rawPayload: safePayload(req.body), receivedAt: new Date(),
   };
   await db.insert(paymentsTable).values(values).onDuplicateKeyUpdate({ set: { rawPayload: values.rawPayload } });
   const [payment] = await db.select().from(paymentsTable).where(eq(paymentsTable.referenceCode, referenceCode));
@@ -78,7 +87,7 @@ router.post(["/stk/:token/callback", "/mpesa/stk/:token/callback"], async (req, 
     const values = {
       pharmacyId: config.pharmacyId, method: "mpesa", amount: String(get("Amount") ?? 0),
       status: succeeded ? "unmatched" : "failed", source: "stk", referenceCode, checkoutRequestId: String(callback.CheckoutRequestID),
-      payerPhone: normalizePhone(String(get("PhoneNumber") ?? "")), rawPayload: JSON.stringify(req.body).slice(0, 4096), receivedAt: new Date(),
+      payerPhone: callbackPhone(get("PhoneNumber")), rawPayload: safePayload(req.body), receivedAt: new Date(),
     };
     await db.insert(paymentsTable).values(values).onDuplicateKeyUpdate({ set: { referenceCode, amount: values.amount, status: values.status, rawPayload: values.rawPayload } });
     const [payment] = await db.select().from(paymentsTable).where(eq(paymentsTable.checkoutRequestId, values.checkoutRequestId));

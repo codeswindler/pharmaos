@@ -13,6 +13,22 @@ import { getPharmacyId, requireManagement } from "../middleware/auth";
 
 const router = Router();
 
+const cleanOptional = (value: unknown): string | null => {
+  if (value === null || value === undefined) return null;
+  const trimmed = String(value).trim();
+  return trimmed ? trimmed : null;
+};
+
+const productValues = (data: Record<string, any>) => ({
+  ...data,
+  barcode: cleanOptional(data.barcode),
+  description: cleanOptional(data.description),
+  manufacturer: cleanOptional(data.manufacturer),
+  expiryDate: cleanOptional(data.expiryDate),
+  costPrice: data.costPrice ? String(data.costPrice) : null,
+  ...(data.price !== undefined && { price: String(data.price) }),
+});
+
 router.get("/", async (req, res) => {
   const query = ListProductsQueryParams.safeParse(req.query);
   if (!query.success) {
@@ -77,12 +93,11 @@ router.post("/", requireManagement, async (req, res) => {
   }
 
   const pharmacyId = getPharmacyId(req);
-  const [{ id }] = await db.insert(productsTable).values({
+  const values = {
     pharmacyId,
-    ...body.data,
-    price: String(body.data.price),
-    costPrice: body.data.costPrice ? String(body.data.costPrice) : null,
-  }).$returningId();
+    ...productValues(body.data),
+  } as any;
+  const [{ id }] = await db.insert(productsTable).values(values).$returningId();
   const [product] = await db.select().from(productsTable).where(eq(productsTable.id, id));
 
   res.status(201).json({
@@ -151,9 +166,7 @@ router.patch("/:id", requireManagement, async (req, res) => {
     return;
   }
 
-  const updateData: Record<string, unknown> = { ...body.data };
-  if (body.data.price !== undefined) updateData.price = String(body.data.price);
-  if (body.data.costPrice !== undefined) updateData.costPrice = body.data.costPrice ? String(body.data.costPrice) : null;
+  const updateData: Record<string, unknown> = productValues(body.data);
 
   const scope = and(eq(productsTable.id, params.data.id), eq(productsTable.pharmacyId, getPharmacyId(req)));
   await db.update(productsTable).set(updateData).where(scope);

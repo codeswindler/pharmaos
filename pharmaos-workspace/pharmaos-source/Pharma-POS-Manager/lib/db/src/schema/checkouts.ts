@@ -1,4 +1,4 @@
-import { mysqlTable, int, decimal, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { mysqlTable, int, decimal, text, timestamp, varchar } from "drizzle-orm/mysql-core";
 import { pharmaciesTable } from "./pharmacies";
 import { usersTable } from "./users";
 import { customersTable } from "./customers";
@@ -50,8 +50,8 @@ export const paymentsTable = mysqlTable("payments", {
   referenceCode: varchar("reference_code", { length: 128 }).unique(),
   checkoutRequestId: varchar("checkout_request_id", { length: 128 }).unique(),
   payerName: varchar("payer_name", { length: 255 }),
-  payerPhone: varchar("payer_phone", { length: 32 }),
-  rawPayload: varchar("raw_payload", { length: 4096 }),
+  payerPhone: varchar("payer_phone", { length: 128 }),
+  rawPayload: text("raw_payload"),
   receivedAt: timestamp("received_at", { mode: "date" }).notNull().defaultNow(),
   attachedAt: timestamp("attached_at", { mode: "date" }),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
