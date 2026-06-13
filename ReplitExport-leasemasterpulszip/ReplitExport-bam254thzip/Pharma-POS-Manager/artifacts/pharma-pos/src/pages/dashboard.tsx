@@ -17,6 +17,24 @@ function formatKES(amount: number | null | undefined) {
   return `KES ${n.toLocaleString("en-KE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+function CurrencyYAxisTick({
+  x = 0,
+  y = 0,
+  payload,
+}: {
+  x?: number;
+  y?: number;
+  payload?: { value?: number | string };
+}) {
+  const value = Number(payload?.value ?? 0);
+
+  return (
+    <text x={x} y={y} dy={4} textAnchor="end" fill="hsl(215 16% 47%)" fontSize={11}>
+      {`KES ${value.toLocaleString("en-KE", { maximumFractionDigits: 0 })}`}
+    </text>
+  );
+}
+
 function formatEAT(isoString: string) {
   const date = new Date(isoString);
   const eatOffset = 3 * 60 * 60 * 1000;
@@ -35,7 +53,7 @@ interface StatCardProps {
   title: string;
   value: number;
   change?: number;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
   formatAsCurrency?: boolean;
   accentColor?: string;
 }
@@ -134,16 +152,14 @@ export default function Dashboard() {
                 <Skeleton className="h-full w-full" />
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartData}>
+                  <BarChart data={chartData} margin={{ top: 6, right: 8, left: 10, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.05)" />
                     <XAxis dataKey="label" fontSize={11} tickLine={false} axisLine={false} tick={{ fill: "hsl(215 16% 47%)" }} />
                     <YAxis
-                      fontSize={11}
                       tickLine={false}
                       axisLine={false}
-                      tickFormatter={(v) => `KES ${v}`}
-                      tick={{ fill: "hsl(215 16% 47%)" }}
-                      width={72}
+                      tick={<CurrencyYAxisTick />}
+                      width={88}
                     />
                     <RechartsTooltip
                       formatter={(value: number) => [`KES ${value.toLocaleString()}`, "Revenue"]}

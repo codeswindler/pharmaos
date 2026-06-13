@@ -1,438 +1,441 @@
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
-import { useListProducts, useCreateTransaction } from "@workspace/api-client-react";
-import { CardContent } from "@/components/ui/card";
+import { useListProducts } from "@workspace/api-client-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Search, Plus, Minus, Trash2, CreditCard, Banknote, User, ShoppingCart } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { MpesaModal } from "@/components/MpesaModal";
+import { Badge } from "@/components/ui/badge";
+import { ArrowLeft, Check, Minus, Package, Plus, RefreshCw, Search, ShoppingCart, Trash2, X } from "lucide-react";
 
-interface CartItem {
-  product: any;
-  quantity: number;
-}
+type CartItem = { product: any; quantity: number };
+type Payment = {
+  id: number;
+  method: "cash" | "mpesa";
+  amount: number;
+  appliedAmount: number;
+  changeAmount: number;
+  status: string;
+  referenceCode?: string | null;
+  payerName?: string | null;
+  payerPhone?: string | null;
+  receivedAt: string;
+};
+type CheckoutData = {
+  id: number;
+  customerName?: string | null;
+  totalAmount: number;
+  paidAmount: number;
+  balanceAmount: number;
+  changeAmount: number;
+  status: string;
+  expiresAt: string;
+  payments: Payment[];
+};
+type PaymentMode = "chooser" | "mpesa" | "stk" | "cash";
 
-interface MpesaPaymentResult {
-  status: "completed";
-  payerName?: string;
-  payerPhone?: string;
-  amount?: number;
-  mpesaReceiptNumber?: string;
-}
-
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "/api";
-
-function formatKES(amount: number) {
-  return `KES ${amount.toLocaleString("en-KE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
+const MPESA_LOGO = "/payment-assets/mpesa-logo.png";
+const CASH_LOGO = "/payment-assets/cash-payment-clean.png";
+const money = (value: number) => `KES ${Number(value).toLocaleString("en-KE", { minimumFractionDigits: 2 })}`;
 
 export default function Checkout() {
+  const { token } = useAuth();
+  const { toast } = useToast();
+  const [, navigate] = useLocation();
   const [search, setSearch] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [paymentMethod, setPaymentMethod] = useState<"cash" | "card" | "mobile_money" | "other">("cash");
-  const [paidAmount, setPaidAmount] = useState<string>("");
   const [customerName, setCustomerName] = useState("");
+  const [checkout, setCheckout] = useState<CheckoutData | null>(null);
+  const [cashAmount, setCashAmount] = useState("");
+  const [mpesaAmount, setMpesaAmount] = useState("");
   const [mpesaPhone, setMpesaPhone] = useState("");
-  const [mpesaModalOpen, setMpesaModalOpen] = useState(false);
-  const [mpesaCheckoutId, setMpesaCheckoutId] = useState<string | null>(null);
-  const [mpesaLoading, setMpesaLoading] = useState(false);
-  const [, setLocation] = useLocation();
-  const { toast } = useToast();
+  const [unmatched, setUnmatched] = useState<Payment[]>([]);
+  const [suggested, setSuggested] = useState<Payment | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [paymentMode, setPaymentMode] = useState<PaymentMode>("chooser");
+  const { data: products, isLoading } = useListProducts({ search });
+  const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
 
-  const { data: products, isLoading: loadingProducts } = useListProducts({ search });
-  const createTransaction = useCreateTransaction();
+  const total = useMemo(() => cart.reduce((sum, item) => sum + Number(item.product.price) * item.quantity, 0), [cart]);
+  const remainingBalance = checkout?.balanceAmount ?? total;
 
-  const handleAddToCart = (product: any) => {
-    if (product.stockQty <= 0) {
-      toast({ title: "Out of stock", variant: "destructive" });
-      return;
+  const api = async (path: string, init?: RequestInit) => {
+    const response = await fetch(`/api${path}`, { ...init, headers: { ...headers, ...init?.headers } });
+    const data = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(data?.error || "Request failed");
+    return data;
+  };
+
+  const refreshCheckout = async (returnToChooser = false) => {
+    if (!checkout) return null;
+    const fresh = await api(`/checkouts/${checkout.id}`);
+    setCheckout(fresh);
+    if (fresh.status === "completed") {
+      setPaymentModalOpen(false);
+      navigate(`/checkout/receipt/${fresh.id}`);
+      return fresh;
     }
-    setCart((prev) => {
-      const existing = prev.find((item) => item.product.id === product.id);
-      if (existing) {
-        if (existing.quantity >= product.stockQty) {
-          toast({ title: "Cannot exceed available stock", variant: "destructive" });
-          return prev;
-        }
-        return prev.map((item) =>
-          item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
-        );
-      }
-      return [...prev, { product, quantity: 1 }];
-    });
-  };
-
-  const handleRemoveFromCart = (productId: number) => {
-    setCart((prev) => prev.filter((item) => item.product.id !== productId));
-  };
-
-  const handleUpdateQuantity = (productId: number, delta: number) => {
-    setCart((prev) =>
-      prev.map((item) => {
-        if (item.product.id === productId) {
-          const newQty = item.quantity + delta;
-          if (newQty <= 0) return item;
-          if (newQty > item.product.stockQty) {
-            toast({ title: "Cannot exceed available stock", variant: "destructive" });
-            return item;
-          }
-          return { ...item, quantity: newQty };
-        }
-        return item;
-      })
-    );
-  };
-
-  const totals = useMemo(() => {
-    const subtotal = cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
-    return { subtotal, total: subtotal };
-  }, [cart]);
-
-  const changeDue = useMemo(() => {
-    const paid = parseFloat(paidAmount) || 0;
-    return Math.max(0, paid - totals.total);
-  }, [paidAmount, totals.total]);
-
-  const doCreateTransaction = (opts?: { referenceCode?: string; paidAmt?: number; custName?: string }) => {
-    const paid = opts?.paidAmt ?? (parseFloat(paidAmount) || 0);
-    const ref = opts?.referenceCode;
-    const name = (opts?.custName ?? customerName) || undefined;
-
-    createTransaction.mutate(
-      {
-        data: {
-          items: cart.map((item) => ({ productId: item.product.id, quantity: item.quantity })),
-          paymentMethod,
-          paidAmount: paymentMethod === "cash" ? paid : totals.total,
-          customerName: name,
-          referenceCode: ref,
-        },
-      },
-      {
-        onSuccess: (data) => {
-          toast({ title: "Transaction created successfully" });
-          setLocation(`/checkout/confirm/${data.id}`);
-        },
-        onError: () => {
-          toast({ title: "Failed to create transaction", variant: "destructive" });
-        },
-      }
-    );
-  };
-
-  const handleProcessPayment = () => {
-    if (cart.length === 0) return;
-
-    if (paymentMethod === "mobile_money") {
-      const rawPhone = mpesaPhone.trim();
-      if (!rawPhone) {
-        toast({ title: "Please enter customer phone number for M-PESA", variant: "destructive" });
-        return;
-      }
-      handleInitiateMpesa(rawPhone);
-      return;
+    setMpesaAmount(String(fresh.balanceAmount));
+    if (returnToChooser) {
+      setPaymentMode("chooser");
+      setPaymentModalOpen(true);
     }
-
-    const paid = parseFloat(paidAmount) || 0;
-    if (paid < totals.total && paymentMethod === "cash") {
-      toast({ title: "Paid amount is less than total", variant: "destructive" });
-      return;
-    }
-
-    doCreateTransaction();
+    return fresh;
   };
 
-  const handleInitiateMpesa = async (phone: string) => {
-    setMpesaLoading(true);
+  const loadUnmatched = async (showSuggestion = false, checkoutId = checkout?.id) => {
+    if (!checkoutId) return;
+    const rows = await api(`/payments/unmatched?checkoutId=${checkoutId}`);
+    setUnmatched(rows);
+    if (showSuggestion && rows[0]) setSuggested(rows[0]);
+  };
+
+  const findPayments = async (showSuggestion = false) => {
     try {
-      const normalised = phone.replace(/^(0|\+?254)/, "254").replace(/\D/g, "");
-      const res = await fetch(`${API_BASE}/transactions/mpesa/initiate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: normalised, amount: totals.total, accountRef: "PharmaOS" }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error((err as any).error || "Failed to initiate M-PESA");
-      }
-
-      const data = await res.json() as { checkoutRequestId: string };
-      setMpesaCheckoutId(data.checkoutRequestId);
-      setMpesaModalOpen(true);
-    } catch (err: any) {
-      toast({ title: err.message || "M-PESA request failed", variant: "destructive" });
-    } finally {
-      setMpesaLoading(false);
+      await loadUnmatched(showSuggestion);
+    } catch (error: any) {
+      toast({ title: error.message, variant: "destructive" });
     }
   };
 
-  const handleMpesaConfirm = (result: MpesaPaymentResult) => {
-    setMpesaModalOpen(false);
-    const custName = result.payerName?.trim() || customerName || undefined;
-    doCreateTransaction({
-      referenceCode: result.mpesaReceiptNumber,
-      paidAmt: result.amount ?? totals.total,
-      custName,
+  useEffect(() => {
+    if (!checkout || checkout.status !== "open" || !token) return;
+    const events = new EventSource(`/api/payments/events?token=${encodeURIComponent(token)}`);
+    events.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === "payment_received") void findPayments(true);
+    };
+    return () => events.close();
+  }, [checkout?.id, token]);
+
+  const add = (product: any) => {
+    if (checkout || product.stockQty <= 0) return;
+    setCart(items => {
+      const current = items.find(item => item.product.id === product.id);
+      if (current && current.quantity >= product.stockQty) return items;
+      return current
+        ? items.map(item => item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item)
+        : [...items, { product, quantity: 1 }];
     });
   };
 
-  const handleMpesaCancel = () => {
-    setMpesaModalOpen(false);
-    setMpesaCheckoutId(null);
+  const changeQty = (productId: number, delta: number) => setCart(items => items
+    .map(item => item.product.id === productId ? { ...item, quantity: Math.min(item.product.stockQty, item.quantity + delta) } : item)
+    .filter(item => item.quantity > 0));
+
+  const openCheckout = async () => {
+    setBusy(true);
+    try {
+      const created = await api("/checkouts", {
+        method: "POST",
+        body: JSON.stringify({ customerName: customerName || undefined, items: cart.map(item => ({ productId: item.product.id, quantity: item.quantity })) }),
+      });
+      setCheckout(created);
+      setMpesaAmount(String(created.balanceAmount));
+      setPaymentMode("chooser");
+      setPaymentModalOpen(true);
+      toast({ title: "Checkout reserved", description: "Stock is reserved for 15 minutes. Choose a payment option." });
+    } catch (error: any) {
+      toast({ title: error.message, variant: "destructive" });
+    } finally { setBusy(false); }
   };
 
-  const isChargeDisabled =
-    cart.length === 0 ||
-    createTransaction.isPending ||
-    mpesaLoading ||
-    (paymentMethod === "cash" && (parseFloat(paidAmount) || 0) < totals.total) ||
-    (paymentMethod === "mobile_money" && !mpesaPhone.trim());
+  const openPaymentMode = async (mode: PaymentMode) => {
+    if (!checkout) return;
+    setPaymentMode(mode);
+    setPaymentModalOpen(true);
+    if (mode === "cash") setCashAmount("");
+    if (mode === "stk") setMpesaAmount(String(checkout.balanceAmount));
+    if (mode === "mpesa") await findPayments();
+  };
+
+  const addCash = async () => {
+    if (!checkout) return;
+    setBusy(true);
+    try {
+      await api("/payments/cash", { method: "POST", body: JSON.stringify({ checkoutId: checkout.id, amount: Number(cashAmount) }) });
+      setCashAmount("");
+      await refreshCheckout(true);
+    } catch (error: any) { toast({ title: error.message, variant: "destructive" }); }
+    finally { setBusy(false); }
+  };
+
+  const initiateMpesa = async () => {
+    if (!checkout) return;
+    setBusy(true);
+    try {
+      await api("/payments/mpesa/initiate", { method: "POST", body: JSON.stringify({ checkoutId: checkout.id, phone: mpesaPhone, amount: Number(mpesaAmount) }) });
+      toast({ title: "STK Push sent", description: "Waiting for the customer's M-PESA payment." });
+    } catch (error: any) { toast({ title: error.message, variant: "destructive" }); }
+    finally { setBusy(false); }
+  };
+
+  const attachMpesa = async (payment: Payment) => {
+    if (!checkout) return;
+    setBusy(true);
+    try {
+      await api(`/payments/${payment.id}/attach`, { method: "POST", body: JSON.stringify({ checkoutId: checkout.id }) });
+      setSuggested(null);
+      await refreshCheckout(true);
+      await loadUnmatched();
+    } catch (error: any) { toast({ title: error.message, variant: "destructive" }); }
+    finally { setBusy(false); }
+  };
+
+  const cancelCheckout = async () => {
+    if (!checkout) return;
+    try {
+      await api(`/checkouts/${checkout.id}/cancel`, { method: "POST" });
+      setCheckout(null);
+      setCart([]);
+      setCustomerName("");
+      setUnmatched([]);
+      setPaymentModalOpen(false);
+      setPaymentMode("chooser");
+    } catch (error: any) { toast({ title: error.message, variant: "destructive" }); }
+  };
+
+  const PaymentCard = ({
+    mode,
+    title,
+    description,
+    image,
+    badge,
+  }: {
+    mode: PaymentMode;
+    title: string;
+    description: string;
+    image: string;
+    badge?: string;
+  }) => {
+    const isMpesa = image === MPESA_LOGO;
+    const isCash = image === CASH_LOGO;
+
+    return (
+      <button
+        type="button"
+        onClick={() => void openPaymentMode(mode)}
+        className="group rounded-xl border bg-white p-3 text-left transition hover:-translate-y-0.5 hover:border-primary hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary/40"
+      >
+        <div className={`relative mb-3 flex h-28 items-center justify-center rounded-lg ${isMpesa ? "overflow-hidden bg-black" : "overflow-visible bg-transparent"}`}>
+          <img
+            src={image}
+            alt={`${title} logo`}
+            className={isCash ? "h-full w-full scale-110 object-contain p-0" : "max-h-full max-w-full object-contain p-3"}
+          />
+          {badge && <span className="absolute right-2 top-2 rounded-full bg-green-500 px-2.5 py-1 text-[11px] font-black tracking-wide text-white shadow">{badge}</span>}
+        </div>
+        <p className="text-base font-black">{title}</p>
+        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{description}</p>
+      </button>
+    );
+  };
 
   return (
-    <div className="flex flex-col md:flex-row h-full overflow-hidden">
-      <div className="flex-1 flex flex-col overflow-hidden border-r border-border/60">
-        <div className="p-5 border-b border-border/60">
+    <div className="grid h-full overflow-hidden lg:grid-cols-[1fr_430px]">
+      <section className="flex flex-col overflow-hidden border-r">
+        <div className="border-b bg-white p-4">
           <div className="relative">
-            <Search className="absolute left-3.5 top-3 h-4.5 w-4.5 text-muted-foreground" />
-            <Input
-              className="pl-10 h-11 text-sm bg-white rounded-xl border-border/60 focus:ring-2 focus:ring-primary/20"
-              placeholder="Search by product name, SKU, or scan barcode..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+            <Input className="pl-9" placeholder="Search product, SKU, or barcode" value={search} onChange={e => setSearch(e.target.value)} disabled={!!checkout} />
           </div>
         </div>
-
-        <div className="flex-1 overflow-y-auto p-5">
-          {loadingProducts ? (
-            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
-              {[1, 2, 3, 4, 5, 6].map((i) => <Skeleton key={i} className="h-28 rounded-xl" />)}
-            </div>
-          ) : products?.length === 0 ? (
-            <div className="text-center py-16 text-muted-foreground">
-              <Package className="h-10 w-10 mx-auto mb-3 opacity-20" />
-              <p>No products found.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 pb-6">
-              {products?.map((product) => {
-                const inCart = cart.find(i => i.product.id === product.id);
-                return (
-                  <div
-                    key={product.id}
-                    className={`product-card p-4 flex flex-col h-full justify-between ${product.stockQty <= 0 ? "opacity-50 cursor-not-allowed" : ""} ${inCart ? "product-card-active" : ""}`}
-                    onClick={() => handleAddToCart(product)}
-                  >
-                    <div>
-                      <p className="font-semibold text-sm line-clamp-2 leading-snug">{product.name}</p>
-                      <span className="inline-block mt-1 text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground font-medium">
-                        {product.category}
-                      </span>
-                    </div>
-                    <div className="mt-3 flex items-end justify-between">
-                      <p className="font-black text-base text-primary">{formatKES(product.price)}</p>
-                      <p className={`text-[11px] font-semibold ${product.stockQty <= product.lowStockThreshold ? "text-red-500" : "text-muted-foreground"}`}>
-                        {product.stockQty} left
-                      </p>
-                    </div>
-                    {inCart && (
-                      <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary text-white text-[10px] font-black flex items-center justify-center">
-                        {inCart.quantity}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
+        <div className="grid content-start gap-3 overflow-auto p-4 grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
+          {isLoading ? <p className="text-muted-foreground">Loading products...</p> : products?.map(product => (
+            <button key={product.id} onClick={() => add(product)} disabled={!!checkout || product.stockQty <= 0} className="relative rounded-lg border bg-white p-3 text-left hover:border-primary disabled:opacity-50">
+              <p className="text-sm font-semibold">{product.name}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{product.sku}</p>
+              <div className="mt-4 flex justify-between">
+                <strong className="text-primary">{money(product.price)}</strong>
+                <span className="text-xs">{product.stockQty} left</span>
+              </div>
+            </button>
+          ))}
         </div>
-      </div>
+      </section>
 
-      <div className="w-full md:w-[380px] lg:w-[400px] flex flex-col order-panel">
-        <div className="px-5 py-4 border-b border-border/60">
-          <h2 className="text-base font-black tracking-tight flex items-center gap-2">
-            <ShoppingCart className="h-4 w-4 text-primary" />
-            Current Order
-            {cart.length > 0 && (
-              <span className="ml-auto text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-semibold">
-                {cart.reduce((s, i) => s + i.quantity, 0)} items
-              </span>
-            )}
-          </h2>
+      <aside className="flex flex-col overflow-hidden bg-muted/20">
+        <div className="flex items-center gap-2 border-b bg-white p-4">
+          <ShoppingCart className="h-4 w-4 text-primary" />
+          <h2 className="font-black">{checkout ? `Checkout #${checkout.id}` : "Current basket"}</h2>
+          {checkout && <Badge className="ml-auto capitalize">{checkout.status}</Badge>}
         </div>
-
-        <div className="flex-1 overflow-y-auto p-4 space-y-2">
-          {cart.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-muted-foreground py-12">
-              <ShoppingCart className="h-12 w-12 mb-4 opacity-15" />
-              <p className="text-sm">Cart is empty</p>
-              <p className="text-xs text-muted-foreground/60 mt-1">Click a product to add it</p>
-            </div>
-          ) : (
-            cart.map((item) => (
-              <div key={item.product.id} className="flex flex-col bg-white p-3 rounded-xl border border-border/60 shadow-sm">
-                <div className="flex justify-between items-start mb-2">
-                  <p className="font-semibold text-sm pr-4 line-clamp-1">{item.product.name}</p>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6 text-muted-foreground hover:text-red-500 hover:bg-red-50 shrink-0 rounded-lg"
-                    onClick={() => handleRemoveFromCart(item.product.id)}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
+        <div className="flex-1 space-y-3 overflow-auto p-4">
+          {cart.length === 0 ? <div className="py-12 text-center text-muted-foreground"><Package className="mx-auto mb-2 h-10 w-10 opacity-30" />Add products to begin</div> : cart.map(item => (
+            <div key={item.product.id} className="rounded-lg border bg-white p-3">
+              <div className="flex justify-between">
+                <p className="text-sm font-semibold">{item.product.name}</p>
+                {!checkout && <button onClick={() => setCart(items => items.filter(x => x.product.id !== item.product.id))}><Trash2 className="h-4 w-4 text-muted-foreground" /></button>}
+              </div>
+              <div className="mt-2 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Button size="icon" variant="outline" className="h-7 w-7" disabled={!!checkout} onClick={() => changeQty(item.product.id, -1)}><Minus className="h-3 w-3" /></Button>
+                  <b>{item.quantity}</b>
+                  <Button size="icon" variant="outline" className="h-7 w-7" disabled={!!checkout} onClick={() => changeQty(item.product.id, 1)}><Plus className="h-3 w-3" /></Button>
                 </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-1.5">
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-7 w-7 rounded-lg border-border/60"
-                      onClick={() => handleUpdateQuantity(item.product.id, -1)}
-                    >
-                      <Minus className="h-3 w-3" />
-                    </Button>
-                    <span className="w-8 text-center font-bold text-sm">{item.quantity}</span>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-7 w-7 rounded-lg border-border/60"
-                      onClick={() => handleUpdateQuantity(item.product.id, 1)}
-                    >
-                      <Plus className="h-3 w-3" />
-                    </Button>
+                <strong>{money(item.product.price * item.quantity)}</strong>
+              </div>
+            </div>
+          ))}
+
+          {checkout && (
+            <>
+              <div className="space-y-2 rounded-lg border bg-white p-4">
+                <div className="flex justify-between"><span>Total</span><strong>{money(checkout.totalAmount)}</strong></div>
+                <div className="flex justify-between text-green-700"><span>Paid</span><strong>{money(checkout.paidAmount)}</strong></div>
+                <div className="flex justify-between border-t pt-2 text-lg"><span>Balance</span><strong>{money(checkout.balanceAmount)}</strong></div>
+                {checkout.changeAmount > 0 && <div className="flex justify-between"><span>Change</span><strong>{money(checkout.changeAmount)}</strong></div>}
+              </div>
+              {checkout.payments?.map(payment => (
+                <div key={payment.id} className="flex justify-between rounded-lg border bg-white p-3 text-sm">
+                  <span className="capitalize">{payment.method} {payment.referenceCode && `- ${payment.referenceCode}`}</span>
+                  <strong>{money(payment.appliedAmount)}</strong>
+                </div>
+              ))}
+              {checkout.status === "open" && checkout.balanceAmount > 0 && (
+                <div className="rounded-lg border border-primary/20 bg-white p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Remaining balance</p>
+                  <p className="mt-1 text-2xl font-black text-primary">{money(checkout.balanceAmount)}</p>
+                  <Button className="mt-4 w-full" onClick={() => void openPaymentMode("chooser")}>Choose payment method</Button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        <div className="border-t bg-white p-4">
+          {!checkout ? (
+            <>
+              <Input className="mb-3" placeholder="Customer name (optional)" value={customerName} onChange={e => setCustomerName(e.target.value)} />
+              <div className="mb-3 flex justify-between text-xl font-black"><span>Total</span><span>{money(total)}</span></div>
+              <Button className="w-full" disabled={busy || cart.length === 0} onClick={openCheckout}>Review, Reserve & Checkout</Button>
+            </>
+          ) : (
+            <Button variant="outline" className="w-full" onClick={cancelCheckout} disabled={checkout.paidAmount > 0}>Cancel unpaid checkout</Button>
+          )}
+        </div>
+      </aside>
+
+      {checkout && paymentModalOpen && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4">
+          <div className="max-h-[92vh] w-full max-w-3xl overflow-auto rounded-2xl bg-white p-5 shadow-2xl">
+            <div className="mb-5 flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Checkout #{checkout.id}</p>
+                <h2 className="text-2xl font-black">{paymentMode === "chooser" ? "Choose payment method" : paymentMode === "mpesa" ? "MPESA payment" : paymentMode === "stk" ? "STK-PUSH" : "Cash payment"}</h2>
+                <p className="mt-1 text-sm text-muted-foreground">Remaining balance: <span className="font-black text-primary">{money(remainingBalance)}</span></p>
+              </div>
+              <Button variant="ghost" size="icon" onClick={() => setPaymentModalOpen(false)} title="Close payment options"><X className="h-5 w-5" /></Button>
+            </div>
+
+            {paymentMode === "chooser" && (
+              <div className="grid gap-3 md:grid-cols-3">
+                <PaymentCard mode="mpesa" title="MPESA" image={MPESA_LOGO} description="Customer pays to the till or paybill, then cashier confirms the matching payment." />
+                <PaymentCard mode="stk" title="STK-PUSH" image={MPESA_LOGO} badge="STK-PUSH" description="Send a push request to the customer's phone for the remaining or partial balance." />
+                <PaymentCard mode="cash" title="CASH" image={CASH_LOGO} description="Record cash received. Overpayment is allowed and change will be shown." />
+              </div>
+            )}
+
+            {paymentMode === "mpesa" && (
+              <div className="space-y-4">
+                <Button variant="outline" onClick={() => setPaymentMode("chooser")}><ArrowLeft className="mr-2 h-4 w-4" /> Payment options</Button>
+                <div className="rounded-xl border bg-slate-50 p-4">
+                  <p className="font-semibold">Ask the customer to pay any amount up to {money(checkout.balanceAmount)} via MPESA.</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Incoming payments appear here for cashier confirmation before attachment.</p>
+                  <Button variant="outline" className="mt-4" onClick={() => void findPayments()} disabled={busy}><RefreshCw className="mr-2 h-4 w-4" /> Find payments</Button>
+                </div>
+                <PaymentList unmatched={unmatched} checkout={checkout} busy={busy} onAttach={attachMpesa} />
+              </div>
+            )}
+
+            {paymentMode === "stk" && (
+              <div className="space-y-4">
+                <Button variant="outline" onClick={() => setPaymentMode("chooser")}><ArrowLeft className="mr-2 h-4 w-4" /> Payment options</Button>
+                <div className="rounded-xl border bg-slate-50 p-4">
+                  <div className="mb-4 flex h-20 items-center justify-center rounded-lg bg-black">
+                    <img src={MPESA_LOGO} alt="M-PESA logo" className="max-h-full max-w-full object-contain p-3" />
                   </div>
-                  <p className="font-bold text-sm text-primary">
-                    {formatKES(item.product.price * item.quantity)}
-                  </p>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <Input placeholder="2547..." value={mpesaPhone} onChange={e => setMpesaPhone(e.target.value)} />
+                    <Input type="number" max={checkout.balanceAmount} value={mpesaAmount} onChange={e => setMpesaAmount(e.target.value)} />
+                  </div>
+                  <Button className="mt-4 w-full" onClick={initiateMpesa} disabled={busy || !mpesaPhone || Number(mpesaAmount) <= 0 || Number(mpesaAmount) > checkout.balanceAmount}>Send STK-PUSH</Button>
+                  <p className="mt-2 text-xs text-muted-foreground">When the payment arrives, the cashier will confirm and attach it to this checkout.</p>
                 </div>
               </div>
-            ))
-          )}
-        </div>
-
-        <div className="p-4 bg-white border-t border-border/60 shadow-[0_-4px_16px_-6px_rgba(0,0,0,0.06)] z-10 space-y-3">
-          <div className="flex items-center gap-2">
-            <User className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-            <Input
-              placeholder="Customer name (optional)"
-              value={customerName}
-              onChange={(e) => setCustomerName(e.target.value)}
-              className="h-9 text-sm rounded-xl border-border/60"
-            />
-          </div>
-
-          <div className="grid grid-cols-3 gap-2">
-            <button
-              className={`pay-method-btn ${paymentMethod === "cash" ? "pay-method-btn-active" : ""}`}
-              onClick={() => setPaymentMethod("cash")}
-            >
-              <Banknote className="h-4 w-4" />
-              <span>Cash</span>
-            </button>
-            <button
-              className={`pay-method-btn ${paymentMethod === "card" ? "pay-method-btn-active" : ""}`}
-              onClick={() => setPaymentMethod("card")}
-            >
-              <CreditCard className="h-4 w-4" />
-              <span>Card</span>
-            </button>
-            <button
-              className={`pay-method-btn ${paymentMethod === "mobile_money" ? "pay-method-mpesa-active" : ""}`}
-              onClick={() => setPaymentMethod("mobile_money")}
-            >
-              <span className="font-black text-[13px] leading-none">M</span>
-              <span style={{ color: paymentMethod === "mobile_money" ? "#00a651" : undefined }}>M-PESA</span>
-            </button>
-          </div>
-
-          {paymentMethod === "mobile_money" && (
-            <div className="flex items-center gap-2">
-              <div className="flex-shrink-0 w-7 h-7 rounded-lg bg-green-50 border border-green-200 flex items-center justify-center">
-                <span className="text-[9px] font-black text-green-700">M</span>
-              </div>
-              <Input
-                placeholder="+254 7XX XXX XXX"
-                value={mpesaPhone}
-                onChange={(e) => setMpesaPhone(e.target.value)}
-                className="h-9 text-sm rounded-xl border-green-200 focus:ring-green-300"
-              />
-            </div>
-          )}
-
-          <div className="space-y-1.5 pt-1 border-t border-border/40">
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-muted-foreground">Subtotal</span>
-              <span className="font-medium">{formatKES(totals.subtotal)}</span>
-            </div>
-            <div className="flex justify-between items-center font-black text-xl border-t border-border/40 pt-2">
-              <span>Total</span>
-              <span className="text-primary">{formatKES(totals.total)}</span>
-            </div>
-          </div>
-
-          {paymentMethod === "cash" && (
-            <div className="space-y-2 border-t border-border/40 pt-2">
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-semibold">Amount Paid</span>
-                <Input
-                  type="number"
-                  value={paidAmount}
-                  onChange={(e) => setPaidAmount(e.target.value)}
-                  className="w-32 text-right font-bold h-9 rounded-xl border-border/60"
-                  placeholder="0.00"
-                />
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">Change Due</span>
-                <span className={`text-lg font-bold ${changeDue > 0 ? "text-green-600" : "text-foreground"}`}>
-                  {formatKES(changeDue)}
-                </span>
-              </div>
-            </div>
-          )}
-
-          <button
-            className="charge-btn w-full h-13 text-base font-black text-white rounded-xl py-3 px-4 flex items-center justify-center gap-2"
-            disabled={isChargeDisabled}
-            onClick={handleProcessPayment}
-          >
-            {createTransaction.isPending || mpesaLoading ? (
-              <>
-                <div className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-                {paymentMethod === "mobile_money" ? "Sending M-PESA..." : "Processing..."}
-              </>
-            ) : paymentMethod === "mobile_money" ? (
-              <>
-                <span className="font-black">M</span>
-                Send M-PESA Request · {formatKES(totals.total)}
-              </>
-            ) : (
-              `Charge ${formatKES(totals.total)}`
             )}
-          </button>
-        </div>
-      </div>
 
-      <MpesaModal
-        open={mpesaModalOpen}
-        phone={mpesaPhone}
-        amount={totals.total}
-        checkoutRequestId={mpesaCheckoutId}
-        onConfirm={handleMpesaConfirm as any}
-        onCancel={handleMpesaCancel}
-      />
+            {paymentMode === "cash" && (
+              <div className="space-y-4">
+                <Button variant="outline" onClick={() => setPaymentMode("chooser")}><ArrowLeft className="mr-2 h-4 w-4" /> Payment options</Button>
+                <div className="rounded-xl border bg-slate-50 p-4">
+                  <div className="mb-4 flex h-24 items-center justify-center rounded-lg bg-white">
+                    <img src={CASH_LOGO} alt="Cash payment logo" className="max-h-full max-w-full object-contain" />
+                  </div>
+                  <Input type="number" min="1" placeholder="Amount received" value={cashAmount} onChange={e => setCashAmount(e.target.value)} />
+                  <Button className="mt-4 w-full" onClick={addCash} disabled={busy || Number(cashAmount) <= 0}>Apply cash payment</Button>
+                  {Number(cashAmount) > checkout.balanceAmount && <p className="mt-2 text-sm font-semibold text-green-700">Change: {money(Number(cashAmount) - checkout.balanceAmount)}</p>}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {suggested && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md space-y-5 rounded-lg bg-white p-6">
+            <div>
+              <Badge className="mb-2">MPESA received</Badge>
+              <h2 className="text-xl font-black">Does this payment belong to checkout #{checkout?.id}?</h2>
+            </div>
+            <div className="rounded-lg border p-4">
+              <p className="text-3xl font-black text-green-700">{money(suggested.amount)}</p>
+              <p className="mt-2 font-semibold">{suggested.payerName || "Name unavailable"}</p>
+              <p className="text-sm text-muted-foreground">{suggested.payerPhone} - {suggested.referenceCode}</p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Button variant="outline" onClick={() => { setSuggested(null); void findPayments(); }}><X className="mr-2 h-4 w-4" /> No</Button>
+              <Button onClick={() => attachMpesa(suggested)} disabled={busy || suggested.amount > (checkout?.balanceAmount ?? 0)}><Check className="mr-2 h-4 w-4" /> Yes, attach</Button>
+            </div>
+            {suggested.amount > (checkout?.balanceAmount ?? 0) && <p className="text-sm text-destructive">This MPESA payment exceeds the remaining balance and cannot be attached.</p>}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function Package({ className }: { className?: string }) {
+function PaymentList({
+  unmatched,
+  checkout,
+  busy,
+  onAttach,
+}: {
+  unmatched: Payment[];
+  checkout: CheckoutData;
+  busy: boolean;
+  onAttach: (payment: Payment) => void;
+}) {
+  if (unmatched.length === 0) {
+    return <div className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">No recent unmatched MPESA payments found yet.</div>;
+  }
   return (
-    <svg className={className} fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
-    </svg>
+    <div className="space-y-2">
+      <h3 className="font-bold">Recent unmatched MPESA payments</h3>
+      {unmatched.map(payment => (
+        <div key={payment.id} className="flex items-center justify-between gap-3 rounded-lg border p-3">
+          <span>
+            <b>{payment.payerName || payment.payerPhone || "MPESA customer"}</b>
+            <small className="block text-muted-foreground">{payment.payerPhone} - {payment.referenceCode}</small>
+          </span>
+          <div className="text-right">
+            <strong>{money(payment.amount)}</strong>
+            <Button size="sm" className="ml-3" onClick={() => onAttach(payment)} disabled={busy || payment.amount > checkout.balanceAmount}>Attach</Button>
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }

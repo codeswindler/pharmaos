@@ -21,8 +21,8 @@ export function Sidebar() {
     { href: "/checkout", label: "Checkout", icon: ShoppingCart },
     { href: "/products", label: "Products", icon: Package },
     { href: "/inventory", label: "Inventory", icon: Archive },
-    { href: "/customers", label: "Customers", icon: Users },
-    { href: "/transactions", label: "Transactions", icon: FileText },
+    { href: "/sales", label: "Sales", icon: FileText },
+    ...(["pharmacy_owner", "manager"].includes(user?.role ?? "") ? [{ href: "/staff", label: "Staff", icon: Users }] : []),
     { href: "/messages", label: "Messages", icon: MessageSquare },
   ];
 

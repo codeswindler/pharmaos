@@ -8,5 +8,4 @@
 
 export interface MpesaInitiateResponse {
   checkoutRequestId: string;
-  message: string;
 }

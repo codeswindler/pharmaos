@@ -6,7 +6,7 @@ import { LayoutDashboard, Building2, LogOut, ShieldCheck } from "lucide-react";
 
 const links = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
-  { href: "/admin/hospitals", label: "Hospitals", icon: Building2, exact: false },
+  { href: "/admin/pharmacies", label: "Pharmacies", icon: Building2, exact: false },
 ];
 
 export function AdminLayout({ children }: { children: ReactNode }) {

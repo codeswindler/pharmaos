@@ -1,16 +1,16 @@
-import { drizzle } from "drizzle-orm/node-postgres";
-import pg from "pg";
+import { drizzle } from "drizzle-orm/mysql2";
+import { createPool } from "mysql2/promise";
 import * as schema from "./schema";
 
-const { Pool } = pg;
+const databaseUrl = process.env.DATABASE_URL ?? process.env.MYSQL_URL;
 
-if (!process.env.DATABASE_URL) {
+if (!databaseUrl) {
   throw new Error(
-    "DATABASE_URL must be set. Did you forget to provision a database?",
+    "DATABASE_URL or MYSQL_URL must be set to a MySQL connection string.",
   );
 }
 
-export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-export const db = drizzle(pool, { schema });
+export const pool = createPool(databaseUrl);
+export const db = drizzle(pool, { schema, mode: "default" });
 
 export * from "./schema";

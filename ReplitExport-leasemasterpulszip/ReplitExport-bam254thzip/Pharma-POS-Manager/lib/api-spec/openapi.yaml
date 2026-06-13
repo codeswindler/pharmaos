@@ -7,6 +7,10 @@ servers:
   - url: /api
     description: Base API path
 tags:
+  - name: auth
+    description: Staff authentication
+  - name: admin
+    description: Super-admin pharmacy management
   - name: health
     description: Health operations
   - name: products
@@ -15,16 +19,200 @@ tags:
     description: Stock and warehouse management
   - name: customers
     description: Customer management
-  - name: transactions
-    description: Sales transactions
+  - name: checkouts
+    description: Sale baskets and lifecycle
   - name: payments
-    description: Payment processing
+    description: Independent cash and M-PESA payment ledger
+  - name: staff
+    description: Pharmacy staff management
   - name: dashboard
     description: Dashboard KPIs and analytics
   - name: messages
     description: Bulk messaging
 
 paths:
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login using email or phone plus password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInput"
+      responses:
+        "200":
+          description: Authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+
+  /auth/me:
+    get:
+      operationId: getCurrentUser
+      tags: [auth]
+      summary: Get the authenticated user and pharmacy
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthMeResponse"
+
+  /admin/pharmacies:
+    get:
+      operationId: listAdminPharmacies
+      tags: [admin]
+      summary: List all pharmacies
+      responses:
+        "200":
+          description: Pharmacies
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminPharmacy"
+    post:
+      operationId: createPharmacy
+      tags: [admin]
+      summary: Create a pharmacy and its owner
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PharmacyInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreatePharmacyResponse"
+
+  /admin/pharmacies/{id}:
+    put:
+      operationId: updatePharmacy
+      tags: [admin]
+      summary: Update a pharmacy
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PharmacyUpdate"
+      responses:
+        "200":
+          description: Updated pharmacy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Pharmacy"
+    delete:
+      operationId: suspendPharmacy
+      tags: [admin]
+      summary: Suspend a pharmacy and its staff
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Suspended
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /admin/pharmacies/{id}/mpesa:
+    put:
+      operationId: configurePharmacyMpesa
+      tags: [admin]
+      summary: Store encrypted M-PESA credentials for a pharmacy
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MpesaConfigInput"
+      responses:
+        "200":
+          description: Configuration saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MpesaConfigResponse"
+
+  /admin/pharmacies/{id}/mpesa/test:
+    post:
+      operationId: testPharmacyMpesa
+      tags: [admin]
+      summary: Test a pharmacy's M-PESA credentials
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Credentials verified
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /admin/pharmacies/{id}/mpesa/register-callbacks:
+    post:
+      operationId: registerPharmacyMpesaCallbacks
+      tags: [admin]
+      summary: Register C2B confirmation and validation callback URLs
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Callbacks registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /admin/stats:
+    get:
+      operationId: getAdminStats
+      tags: [admin]
+      summary: Get platform pharmacy statistics
+      responses:
+        "200":
+          description: Statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminStats"
+
   /healthz:
     get:
       operationId: healthCheck
@@ -202,49 +390,44 @@ paths:
               schema:
                 $ref: "#/components/schemas/InventoryItem"
 
-  # Customers
-  /customers:
+  # Checkouts
+  /checkouts:
     get:
-      operationId: listCustomers
-      tags: [customers]
-      summary: List all customers
-      parameters:
-        - name: search
-          in: query
-          schema:
-            type: string
+      operationId: listCheckouts
+      tags: [checkouts]
+      summary: List pharmacy checkouts
       responses:
         "200":
-          description: Customers
+          description: Checkouts
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/Customer"
+                  $ref: "#/components/schemas/CheckoutSummary"
     post:
-      operationId: createCustomer
-      tags: [customers]
-      summary: Create a customer
+      operationId: createCheckout
+      tags: [checkouts]
+      summary: Create a checkout and reserve stock for 15 minutes
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CustomerInput"
+              $ref: "#/components/schemas/CheckoutInput"
       responses:
         "201":
           description: Created
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Customer"
+                $ref: "#/components/schemas/Checkout"
 
-  /customers/{id}:
+  /checkouts/{id}:
     get:
-      operationId: getCustomer
-      tags: [customers]
-      summary: Get customer by ID
+      operationId: getCheckout
+      tags: [checkouts]
+      summary: Get checkout with items and attached payments
       parameters:
         - name: id
           in: path
@@ -253,144 +436,128 @@ paths:
             type: integer
       responses:
         "200":
-          description: Customer
+          description: Checkout
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Customer"
-    patch:
-      operationId: updateCustomer
-      tags: [customers]
-      summary: Update a customer
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CustomerUpdate"
-      responses:
-        "200":
-          description: Updated
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Customer"
+                $ref: "#/components/schemas/Checkout"
 
-  /customers/{id}/transactions:
-    get:
-      operationId: getCustomerTransactions
-      tags: [customers]
-      summary: Get transaction history for a customer
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-      responses:
-        "200":
-          description: Transactions
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Transaction"
-
-  # Transactions / Checkout
-  /transactions:
-    get:
-      operationId: listTransactions
-      tags: [transactions]
-      summary: List all transactions
-      parameters:
-        - name: from
-          in: query
-          schema:
-            type: string
-            format: date
-        - name: to
-          in: query
-          schema:
-            type: string
-            format: date
-        - name: status
-          in: query
-          schema:
-            type: string
-            enum: [pending, completed, refunded, cancelled]
-      responses:
-        "200":
-          description: Transactions
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Transaction"
+  /checkouts/expire:
     post:
-      operationId: createTransaction
-      tags: [transactions]
-      summary: Create a new transaction (checkout)
+      operationId: expireCheckouts
+      tags: [checkouts]
+      summary: Expire stale open checkouts and release their stock reservations
+      responses:
+        "200":
+          description: Expiry result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExpireResponse"
+
+  /checkouts/{id}/cancel:
+    post:
+      operationId: cancelCheckout
+      tags: [checkouts]
+      summary: Cancel an unpaid checkout and release stock
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Cancelled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Checkout"
+
+  /checkouts/{id}/void:
+    post:
+      operationId: voidCheckout
+      tags: [checkouts]
+      summary: Manager void with refund-required payments
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Voided
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Checkout"
+
+  /checkouts/{id}/receipt:
+    get:
+      operationId: getCheckoutReceipt
+      tags: [checkouts]
+      summary: Get checkout receipt with all attached payments
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Receipt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Receipt"
+
+  # Payments
+  /payments/cash:
+    post:
+      operationId: attachCashPayment
+      tags: [payments]
+      summary: Attach cash to an open checkout
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/TransactionInput"
+              $ref: "#/components/schemas/CashPaymentInput"
       responses:
         "201":
-          description: Created
+          description: Attached payment
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Transaction"
+                $ref: "#/components/schemas/Payment"
 
-  /transactions/recent:
+  /payments/unmatched:
     get:
-      operationId: listRecentTransactions
-      tags: [transactions]
-      summary: List recent transactions (last 60 minutes) for payment confirmation
+      operationId: listUnmatchedPayments
+      tags: [payments]
+      summary: List suggested unmatched M-PESA payments for an open checkout
+      parameters:
+        - name: checkoutId
+          in: query
+          required: true
+          schema:
+            type: integer
       responses:
         "200":
-          description: Recent transactions
+          description: Unmatched payments
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/Transaction"
+                  $ref: "#/components/schemas/Payment"
 
-  /transactions/{id}:
-    get:
-      operationId: getTransaction
-      tags: [transactions]
-      summary: Get transaction by ID
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-      responses:
-        "200":
-          description: Transaction
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Transaction"
-
-  /transactions/{id}/confirm-payment:
+  /payments/{id}/attach:
     post:
-      operationId: confirmPayment
-      tags: [transactions]
-      summary: Confirm payment and link to customer
+      operationId: attachMpesaPayment
+      tags: [payments]
+      summary: Cashier-confirm and attach an unmatched M-PESA payment
       parameters:
         - name: id
           in: path
@@ -402,64 +569,20 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/PaymentConfirmation"
+              $ref: "#/components/schemas/AttachPaymentInput"
       responses:
         "200":
-          description: Payment confirmed
+          description: Attached
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Transaction"
+                $ref: "#/components/schemas/SuccessResponse"
 
-  /transactions/{id}/request-validation-code:
+  /payments/mpesa/initiate:
     post:
-      operationId: requestValidationCode
-      tags: [transactions]
-      summary: Request a validation code for a transaction
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-      responses:
-        "200":
-          description: Validation code sent
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ValidationCodeResponse"
-
-  /transactions/{id}/validate-code:
-    post:
-      operationId: validateTransactionCode
-      tags: [transactions]
-      summary: Validate a transaction using a code
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CodeValidationInput"
-      responses:
-        "200":
-          description: Validated
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Transaction"
-
-  /transactions/mpesa/initiate:
-    post:
-      operationId: initiateMpesa
-      tags: [transactions]
-      summary: Initiate M-PESA STK push for payment
+      operationId: initiateMpesaPayment
+      tags: [payments]
+      summary: Initiate an M-PESA STK Push for an open checkout
       requestBody:
         required: true
         content:
@@ -468,49 +591,148 @@ paths:
               $ref: "#/components/schemas/MpesaInitiateInput"
       responses:
         "200":
-          description: STK push initiated
+          description: STK Push initiated
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/MpesaInitiateResponse"
 
-  /transactions/mpesa/status/{checkoutRequestId}:
+  /payments/events:
     get:
-      operationId: pollMpesaStatus
-      tags: [transactions]
-      summary: Poll M-PESA payment status
+      operationId: streamPaymentEvents
+      tags: [payments]
+      summary: Stream persisted-ledger payment arrival notifications
       parameters:
-        - name: checkoutRequestId
-          in: path
+        - name: token
+          in: query
           required: true
           schema:
             type: string
       responses:
         "200":
-          description: Payment status
+          description: Server-sent event stream
+          content:
+            text/event-stream:
+              schema:
+                type: string
+
+  /payments/mpesa/c2b/{token}/validation:
+    post:
+      operationId: validateC2bPayment
+      tags: [payments]
+      summary: Safaricom C2B validation callback
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MpesaCallbackPayload"
+      responses:
+        "200":
+          description: Validation response
+
+  /payments/mpesa/c2b/{token}/confirmation:
+    post:
+      operationId: confirmC2bPayment
+      tags: [payments]
+      summary: Idempotent Safaricom C2B confirmation callback
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MpesaCallbackPayload"
+      responses:
+        "200":
+          description: Confirmation accepted
+
+  /payments/mpesa/stk/{token}/callback:
+    post:
+      operationId: receiveStkCallback
+      tags: [payments]
+      summary: Idempotent M-PESA Express result callback
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MpesaCallbackPayload"
+      responses:
+        "200":
+          description: Callback accepted
+
+  # Staff
+  /staff:
+    get:
+      operationId: listStaff
+      tags: [staff]
+      summary: List staff in the current pharmacy
+      responses:
+        "200":
+          description: Staff
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/MpesaStatusResponse"
+                type: array
+                items:
+                  $ref: "#/components/schemas/StaffMember"
+    post:
+      operationId: createStaffMember
+      tags: [staff]
+      summary: Create a pharmacy staff member
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StaffInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IdResponse"
 
-  /transactions/{id}/receipt:
-    get:
-      operationId: getReceipt
-      tags: [transactions]
-      summary: Get receipt data for a transaction
+  /staff/{id}:
+    patch:
+      operationId: updateStaffMember
+      tags: [staff]
+      summary: Update a pharmacy staff member
       parameters:
         - name: id
           in: path
           required: true
           schema:
             type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StaffUpdate"
       responses:
         "200":
-          description: Receipt data
+          description: Updated
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Receipt"
+                $ref: "#/components/schemas/SuccessResponse"
 
   # Dashboard / Analytics
   /dashboard/summary:
@@ -652,8 +874,356 @@ paths:
               schema:
                 $ref: "#/components/schemas/Message"
 
+  /messages/summary:
+    get:
+      operationId: getSmsSummary
+      tags: [messages]
+      summary: Get SMS wallet, rate, gateway, and sales-contact summary
+      responses:
+        "200":
+          description: SMS summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SmsSummary"
+
+  /messages/recipients/estimate:
+    get:
+      operationId: estimateMessageRecipients
+      tags: [messages]
+      summary: Count unique M-PESA contacts from completed sales
+      parameters:
+        - name: recipientType
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [all, this_week, range]
+        - name: dateFrom
+          in: query
+          schema:
+            type: string
+        - name: dateTo
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Recipient estimate
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [count]
+                properties:
+                  count:
+                    type: integer
+
+  /messages/quote:
+    post:
+      operationId: quoteMessageCampaign
+      tags: [messages]
+      summary: Quote a sales-contact SMS campaign before billing
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MessageQuoteInput"
+      responses:
+        "200":
+          description: SMS campaign quote
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageQuote"
+
+  /messages/{id}/recipients:
+    get:
+      operationId: listMessageRecipients
+      tags: [messages]
+      summary: List per-recipient provider and delivery states
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Message recipients
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MessageRecipient"
+
+  /messages/{id}/refresh-status:
+    post:
+      operationId: refreshMessageStatus
+      tags: [messages]
+      summary: Fetch unresolved delivery states from the configured gateway
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Refreshed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /messages/wallet/top-up:
+    post:
+      operationId: requestSmsWalletTopUp
+      tags: [messages]
+      summary: Request an SMS wallet top-up
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SmsWalletTopUpInput"
+      responses:
+        "202":
+          description: Top-up requested
+
+  /messages/dlr/{token}:
+    post:
+      operationId: receiveSmsDlr
+      tags: [messages]
+      summary: Receive a provider delivery callback
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SmsDlrPayload"
+      responses:
+        "200":
+          description: Callback accepted
+
+  /messages/transactional-hashed:
+    post:
+      operationId: sendTransactionalHashedSms
+      tags: [messages]
+      summary: Send a transactional SMS to a Safaricom hashed number
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TransactionalHashedSmsInput"
+      responses:
+        "201":
+          description: Transactional SMS accepted
+
 components:
   schemas:
+    LoginInput:
+      type: object
+      required: [identifier, password]
+      properties:
+        identifier:
+          type: string
+        password:
+          type: string
+
+    AuthUser:
+      type: object
+      required: [id, name, email, phone, role]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        role:
+          type: string
+          enum: [super_admin, pharmacy_owner, manager, cashier]
+        pharmacyId:
+          type: ["integer", "null"]
+
+    AuthResponse:
+      type: object
+      required: [token, user]
+      properties:
+        token:
+          type: string
+        user:
+          $ref: "#/components/schemas/AuthUser"
+        pharmacy:
+          oneOf:
+            - $ref: "#/components/schemas/Pharmacy"
+            - type: "null"
+
+    AuthMeResponse:
+      type: object
+      required: [user]
+      properties:
+        user:
+          $ref: "#/components/schemas/AuthUser"
+        pharmacy:
+          oneOf:
+            - $ref: "#/components/schemas/Pharmacy"
+            - type: "null"
+
+    PharmacyInput:
+      type: object
+      required: [name, ownerName, ownerEmail, ownerPhone, ownerPassword]
+      properties:
+        name:
+          type: string
+        address:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+        planType:
+          type: string
+        planValue:
+          type: number
+        ownerName:
+          type: string
+        ownerEmail:
+          type: string
+        ownerPhone:
+          type: string
+        ownerPassword:
+          type: string
+
+    PharmacyUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        address:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+        planType:
+          type: string
+        planValue:
+          type: number
+        status:
+          type: string
+
+    CreatePharmacyResponse:
+      type: object
+      required: [pharmacyId, ownerId]
+      properties:
+        pharmacyId:
+          type: integer
+        ownerId:
+          type: integer
+
+    MpesaConfig:
+      type: object
+      required: [environment, shortcode, transactionType, enabled, registrationStatus]
+      properties:
+        environment:
+          type: string
+          enum: [sandbox, production]
+        shortcode:
+          type: string
+        transactionType:
+          type: string
+          enum: [CustomerPayBillOnline, CustomerBuyGoodsOnline]
+        enabled:
+          type: boolean
+        consumerKey:
+          type: string
+        consumerSecret:
+          type: string
+        passkey:
+          type: ["string", "null"]
+        registrationStatus:
+          type: string
+          enum: [not_registered, registered, failed]
+        credentialsVerifiedAt:
+          type: ["string", "null"]
+        callbacksRegisteredAt:
+          type: ["string", "null"]
+
+    MpesaConfigInput:
+      type: object
+      required: [shortcode]
+      properties:
+        environment:
+          type: string
+          enum: [sandbox, production]
+        shortcode:
+          type: string
+        transactionType:
+          type: string
+          enum: [CustomerPayBillOnline, CustomerBuyGoodsOnline]
+        consumerKey:
+          type: string
+        consumerSecret:
+          type: string
+        passkey:
+          type: string
+        enabled:
+          type: boolean
+
+    MpesaConfigResponse:
+      type: object
+      required: [success]
+      properties:
+        success:
+          type: boolean
+        config:
+          $ref: "#/components/schemas/MpesaConfig"
+
+    MpesaCallbackPayload:
+      type: object
+      additionalProperties: true
+
+    AdminPharmacy:
+      allOf:
+        - $ref: "#/components/schemas/Pharmacy"
+        - type: object
+          required: [userCount]
+          properties:
+            userCount:
+              type: integer
+            mpesa:
+              oneOf:
+                - $ref: "#/components/schemas/MpesaConfig"
+                - type: "null"
+
+    AdminStats:
+      type: object
+      required: [total, active, suspended, monthlyRevenue, totalUsers]
+      properties:
+        total:
+          type: integer
+        active:
+          type: integer
+        suspended:
+          type: integer
+        monthlyRevenue:
+          type: number
+        totalUsers:
+          type: integer
+
     HealthStatus:
       type: object
       properties:
@@ -801,53 +1371,18 @@ components:
         reason:
           type: string
 
-    Customer:
+    CartItem:
       type: object
-      required: [id, name, createdAt]
+      required: [productId, quantity]
       properties:
-        id:
+        productId:
           type: integer
-        name:
-          type: string
-        phone:
-          type: ["string", "null"]
-        email:
-          type: ["string", "null"]
-        loyaltyPoints:
+        quantity:
           type: integer
-        totalSpend:
-          type: number
-        visitCount:
-          type: integer
-        createdAt:
-          type: string
-        lastVisit:
-          type: ["string", "null"]
 
-    CustomerInput:
+    CheckoutSummary:
       type: object
-      required: [name]
-      properties:
-        name:
-          type: string
-        phone:
-          type: string
-        email:
-          type: string
-
-    CustomerUpdate:
-      type: object
-      properties:
-        name:
-          type: string
-        phone:
-          type: string
-        email:
-          type: string
-
-    Transaction:
-      type: object
-      required: [id, totalAmount, status, paymentMethod, createdAt, items]
+      required: [id, totalAmount, paidAmount, balanceAmount, changeAmount, status, expiresAt, createdAt]
       properties:
         id:
           type: integer
@@ -857,38 +1392,44 @@ components:
           type: ["string", "null"]
         totalAmount:
           type: number
-        discountAmount:
-          type: number
-        taxAmount:
-          type: number
         paidAmount:
+          type: number
+        balanceAmount:
           type: number
         changeAmount:
           type: number
         status:
           type: string
-          enum: [pending, completed, refunded, cancelled]
-        paymentMethod:
+          enum: [open, completed, cancelled, expired, voided]
+        expiresAt:
           type: string
-          enum: [cash, card, mobile_money, other]
-        referenceCode:
+        completedAt:
           type: ["string", "null"]
-        validationCode:
-          type: ["string", "null"]
-        isValidated:
-          type: boolean
-        receiptPrinted:
-          type: boolean
         createdAt:
           type: string
-        items:
-          type: array
-          items:
-            $ref: "#/components/schemas/TransactionItem"
 
-    TransactionItem:
+    Checkout:
+      allOf:
+        - $ref: "#/components/schemas/CheckoutSummary"
+        - type: object
+          required: [subtotal, discountAmount, items, payments]
+          properties:
+            subtotal:
+              type: number
+            discountAmount:
+              type: number
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/CheckoutItem"
+            payments:
+              type: array
+              items:
+                $ref: "#/components/schemas/Payment"
+
+    CheckoutItem:
       type: object
-      required: [productId, productName, quantity, unitPrice, totalPrice]
+      required: [productId, productName, sku, quantity, unitPrice, totalPrice]
       properties:
         productId:
           type: integer
@@ -903,109 +1444,199 @@ components:
         totalPrice:
           type: number
 
-    TransactionInput:
+    CheckoutInput:
       type: object
-      required: [items, paymentMethod, paidAmount]
+      required: [items]
       properties:
         customerId:
           type: integer
         customerName:
           type: string
+        discountAmount:
+          type: number
+          default: 0
         items:
           type: array
           items:
             $ref: "#/components/schemas/CartItem"
-        paymentMethod:
-          type: string
-          enum: [cash, card, mobile_money, other]
-        paidAmount:
-          type: number
-        discountAmount:
-          type: number
-          default: 0
-        referenceCode:
-          type: string
 
-    CartItem:
+    Payment:
       type: object
-      required: [productId, quantity]
+      required: [id, method, amount, appliedAmount, changeAmount, status, source, receivedAt]
       properties:
-        productId:
+        id:
           type: integer
-        quantity:
-          type: integer
-
-    PaymentConfirmation:
-      type: object
-      required: [confirmed]
-      properties:
-        confirmed:
-          type: boolean
-        customerId:
-          type: integer
-        customerName:
+        checkoutId:
+          type: ["integer", "null"]
+        method:
           type: string
-
-    ValidationCodeResponse:
-      type: object
-      required: [message, expiresIn]
-      properties:
-        message:
-          type: string
-        code:
-          type: string
-        expiresIn:
-          type: integer
-
-    CodeValidationInput:
-      type: object
-      required: [code]
-      properties:
-        code:
-          type: string
-
-    Receipt:
-      type: object
-      required: [transactionId, items, totalAmount, paidAmount, changeAmount, paymentMethod, createdAt]
-      properties:
-        transactionId:
-          type: integer
-        storeName:
-          type: string
-        storeAddress:
-          type: string
-        storePhone:
-          type: string
-        cashierName:
-          type: string
-        customerName:
-          type: ["string", "null"]
-        items:
-          type: array
-          items:
-            $ref: "#/components/schemas/TransactionItem"
-        subtotal:
+          enum: [cash, mpesa]
+        amount:
           type: number
-        discountAmount:
-          type: number
-        taxAmount:
-          type: number
-        totalAmount:
-          type: number
-        paidAmount:
+        appliedAmount:
           type: number
         changeAmount:
           type: number
-        paymentMethod:
+        status:
           type: string
+          enum: [pending, unmatched, attached, failed, refund_required]
+        source:
+          type: string
+          enum: [manual, c2b, stk]
         referenceCode:
           type: ["string", "null"]
+        checkoutRequestId:
+          type: ["string", "null"]
+        payerName:
+          type: ["string", "null"]
+        payerPhone:
+          type: ["string", "null"]
+        receivedAt:
+          type: string
+
+    CashPaymentInput:
+      type: object
+      required: [checkoutId, amount]
+      properties:
+        checkoutId:
+          type: integer
+        amount:
+          type: number
+
+    AttachPaymentInput:
+      type: object
+      required: [checkoutId]
+      properties:
+        checkoutId:
+          type: integer
+
+    MpesaInitiateInput:
+      type: object
+      required: [checkoutId, phone, amount]
+      properties:
+        checkoutId:
+          type: integer
+        phone:
+          type: string
+        amount:
+          type: number
+
+    MpesaInitiateResponse:
+      type: object
+      required: [checkoutRequestId]
+      properties:
+        checkoutRequestId:
+          type: string
+
+    StaffMember:
+      type: object
+      required: [id, name, email, phone, role, isActive, createdAt]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        role:
+          type: string
+          enum: [pharmacy_owner, manager, cashier]
+        isActive:
+          type: boolean
         createdAt:
           type: string
 
+    StaffInput:
+      type: object
+      required: [name, email, phone, password]
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        password:
+          type: string
+        role:
+          type: string
+          enum: [manager, cashier]
+
+    StaffUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        password:
+          type: string
+        role:
+          type: string
+          enum: [manager, cashier]
+        isActive:
+          type: boolean
+
+    IdResponse:
+      type: object
+      required: [id]
+      properties:
+        id:
+          type: integer
+
+    SuccessResponse:
+      type: object
+      required: [success]
+      properties:
+        success:
+          type: boolean
+
+    ExpireResponse:
+      type: object
+      required: [expired]
+      properties:
+        expired:
+          type: integer
+
+    Pharmacy:
+      type: object
+      required: [id, name, planType, planValue, status]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        address:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        planType:
+          type: string
+        planValue:
+          type: number
+        status:
+          type: string
+
+    Receipt:
+      allOf:
+        - $ref: "#/components/schemas/Checkout"
+        - type: object
+          required: [pharmacy, cashierName]
+          properties:
+            pharmacy:
+              $ref: "#/components/schemas/Pharmacy"
+            cashierName:
+              type: string
+
     DashboardSummary:
       type: object
-      required: [todayRevenue, weekRevenue, monthRevenue, todayTransactions, totalProducts, lowStockCount, outOfStockCount, totalCustomers]
+      required: [todayRevenue, weekRevenue, monthRevenue, todayTransactions, totalProducts, lowStockCount, outOfStockCount]
       properties:
         todayRevenue:
           type: number
@@ -1026,8 +1657,6 @@ components:
         lowStockCount:
           type: integer
         outOfStockCount:
-          type: integer
-        totalCustomers:
           type: integer
         avgTransactionValue:
           type: number
@@ -1094,55 +1723,9 @@ components:
         timestamp:
           type: string
 
-    MpesaInitiateInput:
-      type: object
-      required: [phone, amount, cartItems]
-      properties:
-        phone:
-          type: string
-        amount:
-          type: number
-        customerName:
-          type: string
-        cartItems:
-          type: array
-          items:
-            $ref: "#/components/schemas/CartItem"
-        discountAmount:
-          type: number
-
-    MpesaInitiateResponse:
-      type: object
-      required: [checkoutRequestId, message]
-      properties:
-        checkoutRequestId:
-          type: string
-        message:
-          type: string
-
-    MpesaStatusResponse:
-      type: object
-      required: [status]
-      properties:
-        status:
-          type: string
-          enum: [pending, completed, failed, timeout]
-        transactionId:
-          type: ["integer", "null"]
-        customerName:
-          type: ["string", "null"]
-        phone:
-          type: ["string", "null"]
-        amount:
-          type: ["number", "null"]
-        mpesaCode:
-          type: ["string", "null"]
-        message:
-          type: string
-
     Message:
       type: object
-      required: [id, title, content, recipientCount, status, createdAt]
+      required: [id, title, content, recipientType, recipientCount, characterCount, segmentCount, estimatedCost, actualCost, sentCount, deliveredCount, failedCount, status, createdAt]
       properties:
         id:
           type: integer
@@ -1152,12 +1735,30 @@ components:
           type: string
         recipientType:
           type: string
-          enum: [all, loyalty, inactive, custom]
+          enum: [all, this_week, range, transactional_hashed]
         recipientCount:
+          type: integer
+        characterCount:
+          type: integer
+        segmentCount:
+          type: integer
+        estimatedCost:
+          type: number
+        actualCost:
+          type: number
+        sentCount:
+          type: integer
+        deliveredCount:
+          type: integer
+        failedCount:
           type: integer
         status:
           type: string
-          enum: [draft, sent, scheduled]
+          enum: [queued, processing, sent, delivered, failed, partially_failed]
+        dateFrom:
+          type: ["string", "null"]
+        dateTo:
+          type: ["string", "null"]
         scheduledAt:
           type: ["string", "null"]
         sentAt:
@@ -1175,10 +1776,145 @@ components:
           type: string
         recipientType:
           type: string
-          enum: [all, loyalty, inactive, custom]
-        recipientIds:
+          enum: [all, this_week, range]
+        dateFrom:
+          type: string
+        dateTo:
+          type: string
+
+    MessageQuoteInput:
+      type: object
+      required: [content, recipientType]
+      properties:
+        content:
+          type: string
+        recipientType:
+          type: string
+          enum: [all, this_week, range]
+        dateFrom:
+          type: [string, "null"]
+        dateTo:
+          type: [string, "null"]
+
+    MessageQuote:
+      type: object
+      required: [recipientType, recipientCount, characterCount, segmentCount, unitsPerRecipient, totalUnits, unitBreakdown, unitRate, amountKes, walletBalance, walletShortfall, pendingTopUp, pendingUnits, gatewayEnabled, canSend, unsupported]
+      properties:
+        recipientType:
+          type: string
+        recipientCount:
+          type: integer
+        characterCount:
+          type: integer
+        segmentCount:
+          type: integer
+        unitsPerRecipient:
+          type: integer
+        totalUnits:
+          type: integer
+        unitBreakdown:
           type: array
           items:
-            type: integer
-        scheduledAt:
+            type: object
+            required: [unitsPerRecipient, recipients, totalUnits]
+            properties:
+              unitsPerRecipient:
+                type: integer
+              recipients:
+                type: integer
+              totalUnits:
+                type: integer
+        unitRate:
+          type: number
+        amountKes:
+          type: number
+        walletBalance:
+          type: number
+        walletShortfall:
+          type: number
+        pendingTopUp:
+          type: number
+        pendingUnits:
+          type: integer
+        gatewayEnabled:
+          type: boolean
+        canSend:
+          type: boolean
+        unsupported:
+          type: array
+          items:
+            type: string
+
+    SmsSummary:
+      type: object
+      required: [balance, unitRate, availableUnits, pendingTopUp, pendingUnits, salesContacts, gatewayEnabled]
+      properties:
+        balance:
+          type: number
+        unitRate:
+          type: number
+        availableUnits:
+          type: integer
+        pendingTopUp:
+          type: number
+        pendingUnits:
+          type: integer
+        salesContacts:
+          type: integer
+        gatewayEnabled:
+          type: boolean
+
+    MessageRecipient:
+      type: object
+      required: [id, messageId, pharmacyId, phone, isHashed, status, cost, createdAt]
+      properties:
+        id:
+          type: integer
+        messageId:
+          type: integer
+        pharmacyId:
+          type: integer
+        paymentId:
+          type: ["integer", "null"]
+        recipientName:
+          type: ["string", "null"]
+        phone:
+          type: string
+        isHashed:
+          type: integer
+        providerMessageId:
+          type: ["string", "null"]
+        providerNetworkId:
+          type: ["string", "null"]
+        responseCode:
+          type: ["string", "null"]
+        responseDescription:
+          type: ["string", "null"]
+        status:
+          type: string
+        cost:
+          type: number
+        createdAt:
+          type: string
+
+    SmsWalletTopUpInput:
+      type: object
+      required: [amount]
+      properties:
+        amount:
+          type: number
+
+    SmsDlrPayload:
+      type: object
+      additionalProperties: true
+
+    TransactionalHashedSmsInput:
+      type: object
+      required: [mobile, message]
+      properties:
+        mobile:
+          type: string
+        message:
+          type: string
+        title:
           type: string

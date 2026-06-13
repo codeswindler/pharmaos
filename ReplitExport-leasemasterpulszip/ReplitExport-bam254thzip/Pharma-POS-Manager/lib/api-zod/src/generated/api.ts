@@ -9,6 +9,220 @@ import * as zod from 'zod';
 
 
 /**
+ * @summary Login using email or phone plus password
+ */
+export const LoginBody = zod.object({
+  "identifier": zod.string(),
+  "password": zod.string()
+})
+
+export const LoginResponse = zod.object({
+  "token": zod.string(),
+  "user": zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "email": zod.string(),
+  "phone": zod.string(),
+  "role": zod.enum(['super_admin', 'pharmacy_owner', 'manager', 'cashier']),
+  "pharmacyId": zod.number().nullish()
+}),
+  "pharmacy": zod.union([zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "address": zod.string().nullish(),
+  "phone": zod.string().nullish(),
+  "email": zod.string().nullish(),
+  "planType": zod.string(),
+  "planValue": zod.number(),
+  "status": zod.string()
+}),zod.null()]).optional()
+})
+
+
+/**
+ * @summary Get the authenticated user and pharmacy
+ */
+export const GetCurrentUserResponse = zod.object({
+  "user": zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "email": zod.string(),
+  "phone": zod.string(),
+  "role": zod.enum(['super_admin', 'pharmacy_owner', 'manager', 'cashier']),
+  "pharmacyId": zod.number().nullish()
+}),
+  "pharmacy": zod.union([zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "address": zod.string().nullish(),
+  "phone": zod.string().nullish(),
+  "email": zod.string().nullish(),
+  "planType": zod.string(),
+  "planValue": zod.number(),
+  "status": zod.string()
+}),zod.null()]).optional()
+})
+
+
+/**
+ * @summary List all pharmacies
+ */
+export const ListAdminPharmaciesResponseItem = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "address": zod.string().nullish(),
+  "phone": zod.string().nullish(),
+  "email": zod.string().nullish(),
+  "planType": zod.string(),
+  "planValue": zod.number(),
+  "status": zod.string()
+}).and(zod.object({
+  "userCount": zod.number(),
+  "mpesa": zod.union([zod.object({
+  "environment": zod.enum(['sandbox', 'production']),
+  "shortcode": zod.string(),
+  "transactionType": zod.enum(['CustomerPayBillOnline', 'CustomerBuyGoodsOnline']),
+  "enabled": zod.boolean(),
+  "consumerKey": zod.string().optional(),
+  "consumerSecret": zod.string().optional(),
+  "passkey": zod.string().nullish(),
+  "registrationStatus": zod.enum(['not_registered', 'registered', 'failed']),
+  "credentialsVerifiedAt": zod.string().nullish(),
+  "callbacksRegisteredAt": zod.string().nullish()
+}),zod.null()]).optional()
+}))
+export const ListAdminPharmaciesResponse = zod.array(ListAdminPharmaciesResponseItem)
+
+
+/**
+ * @summary Create a pharmacy and its owner
+ */
+export const CreatePharmacyBody = zod.object({
+  "name": zod.string(),
+  "address": zod.string().optional(),
+  "phone": zod.string().optional(),
+  "email": zod.string().optional(),
+  "planType": zod.string().optional(),
+  "planValue": zod.number().optional(),
+  "ownerName": zod.string(),
+  "ownerEmail": zod.string(),
+  "ownerPhone": zod.string(),
+  "ownerPassword": zod.string()
+})
+
+
+/**
+ * @summary Update a pharmacy
+ */
+export const UpdatePharmacyParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdatePharmacyBody = zod.object({
+  "name": zod.string().optional(),
+  "address": zod.string().optional(),
+  "phone": zod.string().optional(),
+  "email": zod.string().optional(),
+  "planType": zod.string().optional(),
+  "planValue": zod.number().optional(),
+  "status": zod.string().optional()
+})
+
+export const UpdatePharmacyResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "address": zod.string().nullish(),
+  "phone": zod.string().nullish(),
+  "email": zod.string().nullish(),
+  "planType": zod.string(),
+  "planValue": zod.number(),
+  "status": zod.string()
+})
+
+
+/**
+ * @summary Suspend a pharmacy and its staff
+ */
+export const SuspendPharmacyParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const SuspendPharmacyResponse = zod.object({
+  "success": zod.boolean()
+})
+
+
+/**
+ * @summary Store encrypted M-PESA credentials for a pharmacy
+ */
+export const ConfigurePharmacyMpesaParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ConfigurePharmacyMpesaBody = zod.object({
+  "environment": zod.enum(['sandbox', 'production']).optional(),
+  "shortcode": zod.string(),
+  "transactionType": zod.enum(['CustomerPayBillOnline', 'CustomerBuyGoodsOnline']).optional(),
+  "consumerKey": zod.string().optional(),
+  "consumerSecret": zod.string().optional(),
+  "passkey": zod.string().optional(),
+  "enabled": zod.boolean().optional()
+})
+
+export const ConfigurePharmacyMpesaResponse = zod.object({
+  "success": zod.boolean(),
+  "config": zod.object({
+  "environment": zod.enum(['sandbox', 'production']),
+  "shortcode": zod.string(),
+  "transactionType": zod.enum(['CustomerPayBillOnline', 'CustomerBuyGoodsOnline']),
+  "enabled": zod.boolean(),
+  "consumerKey": zod.string().optional(),
+  "consumerSecret": zod.string().optional(),
+  "passkey": zod.string().nullish(),
+  "registrationStatus": zod.enum(['not_registered', 'registered', 'failed']),
+  "credentialsVerifiedAt": zod.string().nullish(),
+  "callbacksRegisteredAt": zod.string().nullish()
+}).optional()
+})
+
+
+/**
+ * @summary Test a pharmacy's M-PESA credentials
+ */
+export const TestPharmacyMpesaParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const TestPharmacyMpesaResponse = zod.object({
+  "success": zod.boolean()
+})
+
+
+/**
+ * @summary Register C2B confirmation and validation callback URLs
+ */
+export const RegisterPharmacyMpesaCallbacksParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const RegisterPharmacyMpesaCallbacksResponse = zod.object({
+  "success": zod.boolean()
+})
+
+
+/**
+ * @summary Get platform pharmacy statistics
+ */
+export const GetAdminStatsResponse = zod.object({
+  "total": zod.number(),
+  "active": zod.number(),
+  "suspended": zod.number(),
+  "monthlyRevenue": zod.number(),
+  "totalUsers": zod.number()
+})
+
+
+/**
  * @summary Health check
  */
 export const HealthCheckResponse = zod.object({
@@ -204,399 +418,399 @@ export const AdjustStockResponse = zod.object({
 
 
 /**
- * @summary List all customers
+ * @summary List pharmacy checkouts
  */
-export const ListCustomersQueryParams = zod.object({
-  "search": zod.coerce.string().optional()
-})
-
-export const ListCustomersResponseItem = zod.object({
-  "id": zod.number(),
-  "name": zod.string(),
-  "phone": zod.string().nullish(),
-  "email": zod.string().nullish(),
-  "loyaltyPoints": zod.number().optional(),
-  "totalSpend": zod.number().optional(),
-  "visitCount": zod.number().optional(),
-  "createdAt": zod.string(),
-  "lastVisit": zod.string().nullish()
-})
-export const ListCustomersResponse = zod.array(ListCustomersResponseItem)
-
-
-/**
- * @summary Create a customer
- */
-export const CreateCustomerBody = zod.object({
-  "name": zod.string(),
-  "phone": zod.string().optional(),
-  "email": zod.string().optional()
-})
-
-
-/**
- * @summary Get customer by ID
- */
-export const GetCustomerParams = zod.object({
-  "id": zod.coerce.number()
-})
-
-export const GetCustomerResponse = zod.object({
-  "id": zod.number(),
-  "name": zod.string(),
-  "phone": zod.string().nullish(),
-  "email": zod.string().nullish(),
-  "loyaltyPoints": zod.number().optional(),
-  "totalSpend": zod.number().optional(),
-  "visitCount": zod.number().optional(),
-  "createdAt": zod.string(),
-  "lastVisit": zod.string().nullish()
-})
-
-
-/**
- * @summary Update a customer
- */
-export const UpdateCustomerParams = zod.object({
-  "id": zod.coerce.number()
-})
-
-export const UpdateCustomerBody = zod.object({
-  "name": zod.string().optional(),
-  "phone": zod.string().optional(),
-  "email": zod.string().optional()
-})
-
-export const UpdateCustomerResponse = zod.object({
-  "id": zod.number(),
-  "name": zod.string(),
-  "phone": zod.string().nullish(),
-  "email": zod.string().nullish(),
-  "loyaltyPoints": zod.number().optional(),
-  "totalSpend": zod.number().optional(),
-  "visitCount": zod.number().optional(),
-  "createdAt": zod.string(),
-  "lastVisit": zod.string().nullish()
-})
-
-
-/**
- * @summary Get transaction history for a customer
- */
-export const GetCustomerTransactionsParams = zod.object({
-  "id": zod.coerce.number()
-})
-
-export const GetCustomerTransactionsResponseItem = zod.object({
+export const ListCheckoutsResponseItem = zod.object({
   "id": zod.number(),
   "customerId": zod.number().nullish(),
   "customerName": zod.string().nullish(),
-  "totalAmount": zod.number(),
-  "discountAmount": zod.number().optional(),
-  "taxAmount": zod.number().optional(),
-  "paidAmount": zod.number().optional(),
-  "changeAmount": zod.number().optional(),
-  "status": zod.enum(['pending', 'completed', 'refunded', 'cancelled']),
-  "paymentMethod": zod.enum(['cash', 'card', 'mobile_money', 'other']),
-  "referenceCode": zod.string().nullish(),
-  "validationCode": zod.string().nullish(),
-  "isValidated": zod.boolean().optional(),
-  "receiptPrinted": zod.boolean().optional(),
-  "createdAt": zod.string(),
-  "items": zod.array(zod.object({
-  "productId": zod.number(),
-  "productName": zod.string(),
-  "sku": zod.string().optional(),
-  "quantity": zod.number(),
-  "unitPrice": zod.number(),
-  "totalPrice": zod.number()
-}))
-})
-export const GetCustomerTransactionsResponse = zod.array(GetCustomerTransactionsResponseItem)
-
-
-/**
- * @summary List all transactions
- */
-export const ListTransactionsQueryParams = zod.object({
-  "from": zod.date().optional(),
-  "to": zod.date().optional(),
-  "status": zod.enum(['pending', 'completed', 'refunded', 'cancelled']).optional()
-})
-
-export const ListTransactionsResponseItem = zod.object({
-  "id": zod.number(),
-  "customerId": zod.number().nullish(),
-  "customerName": zod.string().nullish(),
-  "totalAmount": zod.number(),
-  "discountAmount": zod.number().optional(),
-  "taxAmount": zod.number().optional(),
-  "paidAmount": zod.number().optional(),
-  "changeAmount": zod.number().optional(),
-  "status": zod.enum(['pending', 'completed', 'refunded', 'cancelled']),
-  "paymentMethod": zod.enum(['cash', 'card', 'mobile_money', 'other']),
-  "referenceCode": zod.string().nullish(),
-  "validationCode": zod.string().nullish(),
-  "isValidated": zod.boolean().optional(),
-  "receiptPrinted": zod.boolean().optional(),
-  "createdAt": zod.string(),
-  "items": zod.array(zod.object({
-  "productId": zod.number(),
-  "productName": zod.string(),
-  "sku": zod.string().optional(),
-  "quantity": zod.number(),
-  "unitPrice": zod.number(),
-  "totalPrice": zod.number()
-}))
-})
-export const ListTransactionsResponse = zod.array(ListTransactionsResponseItem)
-
-
-/**
- * @summary Create a new transaction (checkout)
- */
-export const createTransactionBodyDiscountAmountDefault = 0;
-
-export const CreateTransactionBody = zod.object({
-  "customerId": zod.number().optional(),
-  "customerName": zod.string().optional(),
-  "items": zod.array(zod.object({
-  "productId": zod.number(),
-  "quantity": zod.number()
-})),
-  "paymentMethod": zod.enum(['cash', 'card', 'mobile_money', 'other']),
-  "paidAmount": zod.number(),
-  "discountAmount": zod.number().default(createTransactionBodyDiscountAmountDefault),
-  "referenceCode": zod.string().optional()
-})
-
-
-/**
- * @summary List recent transactions (last 60 minutes) for payment confirmation
- */
-export const ListRecentTransactionsResponseItem = zod.object({
-  "id": zod.number(),
-  "customerId": zod.number().nullish(),
-  "customerName": zod.string().nullish(),
-  "totalAmount": zod.number(),
-  "discountAmount": zod.number().optional(),
-  "taxAmount": zod.number().optional(),
-  "paidAmount": zod.number().optional(),
-  "changeAmount": zod.number().optional(),
-  "status": zod.enum(['pending', 'completed', 'refunded', 'cancelled']),
-  "paymentMethod": zod.enum(['cash', 'card', 'mobile_money', 'other']),
-  "referenceCode": zod.string().nullish(),
-  "validationCode": zod.string().nullish(),
-  "isValidated": zod.boolean().optional(),
-  "receiptPrinted": zod.boolean().optional(),
-  "createdAt": zod.string(),
-  "items": zod.array(zod.object({
-  "productId": zod.number(),
-  "productName": zod.string(),
-  "sku": zod.string().optional(),
-  "quantity": zod.number(),
-  "unitPrice": zod.number(),
-  "totalPrice": zod.number()
-}))
-})
-export const ListRecentTransactionsResponse = zod.array(ListRecentTransactionsResponseItem)
-
-
-/**
- * @summary Get transaction by ID
- */
-export const GetTransactionParams = zod.object({
-  "id": zod.coerce.number()
-})
-
-export const GetTransactionResponse = zod.object({
-  "id": zod.number(),
-  "customerId": zod.number().nullish(),
-  "customerName": zod.string().nullish(),
-  "totalAmount": zod.number(),
-  "discountAmount": zod.number().optional(),
-  "taxAmount": zod.number().optional(),
-  "paidAmount": zod.number().optional(),
-  "changeAmount": zod.number().optional(),
-  "status": zod.enum(['pending', 'completed', 'refunded', 'cancelled']),
-  "paymentMethod": zod.enum(['cash', 'card', 'mobile_money', 'other']),
-  "referenceCode": zod.string().nullish(),
-  "validationCode": zod.string().nullish(),
-  "isValidated": zod.boolean().optional(),
-  "receiptPrinted": zod.boolean().optional(),
-  "createdAt": zod.string(),
-  "items": zod.array(zod.object({
-  "productId": zod.number(),
-  "productName": zod.string(),
-  "sku": zod.string().optional(),
-  "quantity": zod.number(),
-  "unitPrice": zod.number(),
-  "totalPrice": zod.number()
-}))
-})
-
-
-/**
- * @summary Confirm payment and link to customer
- */
-export const ConfirmPaymentParams = zod.object({
-  "id": zod.coerce.number()
-})
-
-export const ConfirmPaymentBody = zod.object({
-  "confirmed": zod.boolean(),
-  "customerId": zod.number().optional(),
-  "customerName": zod.string().optional()
-})
-
-export const ConfirmPaymentResponse = zod.object({
-  "id": zod.number(),
-  "customerId": zod.number().nullish(),
-  "customerName": zod.string().nullish(),
-  "totalAmount": zod.number(),
-  "discountAmount": zod.number().optional(),
-  "taxAmount": zod.number().optional(),
-  "paidAmount": zod.number().optional(),
-  "changeAmount": zod.number().optional(),
-  "status": zod.enum(['pending', 'completed', 'refunded', 'cancelled']),
-  "paymentMethod": zod.enum(['cash', 'card', 'mobile_money', 'other']),
-  "referenceCode": zod.string().nullish(),
-  "validationCode": zod.string().nullish(),
-  "isValidated": zod.boolean().optional(),
-  "receiptPrinted": zod.boolean().optional(),
-  "createdAt": zod.string(),
-  "items": zod.array(zod.object({
-  "productId": zod.number(),
-  "productName": zod.string(),
-  "sku": zod.string().optional(),
-  "quantity": zod.number(),
-  "unitPrice": zod.number(),
-  "totalPrice": zod.number()
-}))
-})
-
-
-/**
- * @summary Request a validation code for a transaction
- */
-export const RequestValidationCodeParams = zod.object({
-  "id": zod.coerce.number()
-})
-
-export const RequestValidationCodeResponse = zod.object({
-  "message": zod.string(),
-  "code": zod.string().optional(),
-  "expiresIn": zod.number()
-})
-
-
-/**
- * @summary Validate a transaction using a code
- */
-export const ValidateTransactionCodeParams = zod.object({
-  "id": zod.coerce.number()
-})
-
-export const ValidateTransactionCodeBody = zod.object({
-  "code": zod.string()
-})
-
-export const ValidateTransactionCodeResponse = zod.object({
-  "id": zod.number(),
-  "customerId": zod.number().nullish(),
-  "customerName": zod.string().nullish(),
-  "totalAmount": zod.number(),
-  "discountAmount": zod.number().optional(),
-  "taxAmount": zod.number().optional(),
-  "paidAmount": zod.number().optional(),
-  "changeAmount": zod.number().optional(),
-  "status": zod.enum(['pending', 'completed', 'refunded', 'cancelled']),
-  "paymentMethod": zod.enum(['cash', 'card', 'mobile_money', 'other']),
-  "referenceCode": zod.string().nullish(),
-  "validationCode": zod.string().nullish(),
-  "isValidated": zod.boolean().optional(),
-  "receiptPrinted": zod.boolean().optional(),
-  "createdAt": zod.string(),
-  "items": zod.array(zod.object({
-  "productId": zod.number(),
-  "productName": zod.string(),
-  "sku": zod.string().optional(),
-  "quantity": zod.number(),
-  "unitPrice": zod.number(),
-  "totalPrice": zod.number()
-}))
-})
-
-
-/**
- * @summary Initiate M-PESA STK push for payment
- */
-export const InitiateMpesaBody = zod.object({
-  "phone": zod.string(),
-  "amount": zod.number(),
-  "customerName": zod.string().optional(),
-  "cartItems": zod.array(zod.object({
-  "productId": zod.number(),
-  "quantity": zod.number()
-})),
-  "discountAmount": zod.number().optional()
-})
-
-export const InitiateMpesaResponse = zod.object({
-  "checkoutRequestId": zod.string(),
-  "message": zod.string()
-})
-
-
-/**
- * @summary Poll M-PESA payment status
- */
-export const PollMpesaStatusParams = zod.object({
-  "checkoutRequestId": zod.coerce.string()
-})
-
-export const PollMpesaStatusResponse = zod.object({
-  "status": zod.enum(['pending', 'completed', 'failed', 'timeout']),
-  "transactionId": zod.number().nullish(),
-  "customerName": zod.string().nullish(),
-  "phone": zod.string().nullish(),
-  "amount": zod.number().nullish(),
-  "mpesaCode": zod.string().nullish(),
-  "message": zod.string().optional()
-})
-
-
-/**
- * @summary Get receipt data for a transaction
- */
-export const GetReceiptParams = zod.object({
-  "id": zod.coerce.number()
-})
-
-export const GetReceiptResponse = zod.object({
-  "transactionId": zod.number(),
-  "storeName": zod.string().optional(),
-  "storeAddress": zod.string().optional(),
-  "storePhone": zod.string().optional(),
-  "cashierName": zod.string().optional(),
-  "customerName": zod.string().nullish(),
-  "items": zod.array(zod.object({
-  "productId": zod.number(),
-  "productName": zod.string(),
-  "sku": zod.string().optional(),
-  "quantity": zod.number(),
-  "unitPrice": zod.number(),
-  "totalPrice": zod.number()
-})),
-  "subtotal": zod.number().optional(),
-  "discountAmount": zod.number().optional(),
-  "taxAmount": zod.number().optional(),
   "totalAmount": zod.number(),
   "paidAmount": zod.number(),
+  "balanceAmount": zod.number(),
   "changeAmount": zod.number(),
-  "paymentMethod": zod.string(),
-  "referenceCode": zod.string().nullish(),
+  "status": zod.enum(['open', 'completed', 'cancelled', 'expired', 'voided']),
+  "expiresAt": zod.string(),
+  "completedAt": zod.string().nullish(),
   "createdAt": zod.string()
+})
+export const ListCheckoutsResponse = zod.array(ListCheckoutsResponseItem)
+
+
+/**
+ * @summary Create a checkout and reserve stock for 15 minutes
+ */
+export const createCheckoutBodyDiscountAmountDefault = 0;
+
+export const CreateCheckoutBody = zod.object({
+  "customerId": zod.number().optional(),
+  "customerName": zod.string().optional(),
+  "discountAmount": zod.number().default(createCheckoutBodyDiscountAmountDefault),
+  "items": zod.array(zod.object({
+  "productId": zod.number(),
+  "quantity": zod.number()
+}))
+})
+
+
+/**
+ * @summary Get checkout with items and attached payments
+ */
+export const GetCheckoutParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetCheckoutResponse = zod.object({
+  "id": zod.number(),
+  "customerId": zod.number().nullish(),
+  "customerName": zod.string().nullish(),
+  "totalAmount": zod.number(),
+  "paidAmount": zod.number(),
+  "balanceAmount": zod.number(),
+  "changeAmount": zod.number(),
+  "status": zod.enum(['open', 'completed', 'cancelled', 'expired', 'voided']),
+  "expiresAt": zod.string(),
+  "completedAt": zod.string().nullish(),
+  "createdAt": zod.string()
+}).and(zod.object({
+  "subtotal": zod.number(),
+  "discountAmount": zod.number(),
+  "items": zod.array(zod.object({
+  "productId": zod.number(),
+  "productName": zod.string(),
+  "sku": zod.string(),
+  "quantity": zod.number(),
+  "unitPrice": zod.number(),
+  "totalPrice": zod.number()
+})),
+  "payments": zod.array(zod.object({
+  "id": zod.number(),
+  "checkoutId": zod.number().nullish(),
+  "method": zod.enum(['cash', 'mpesa']),
+  "amount": zod.number(),
+  "appliedAmount": zod.number(),
+  "changeAmount": zod.number(),
+  "status": zod.enum(['pending', 'unmatched', 'attached', 'failed', 'refund_required']),
+  "source": zod.enum(['manual', 'c2b', 'stk']),
+  "referenceCode": zod.string().nullish(),
+  "checkoutRequestId": zod.string().nullish(),
+  "payerName": zod.string().nullish(),
+  "payerPhone": zod.string().nullish(),
+  "receivedAt": zod.string()
+}))
+}))
+
+
+/**
+ * @summary Expire stale open checkouts and release their stock reservations
+ */
+export const ExpireCheckoutsResponse = zod.object({
+  "expired": zod.number()
+})
+
+
+/**
+ * @summary Cancel an unpaid checkout and release stock
+ */
+export const CancelCheckoutParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const CancelCheckoutResponse = zod.object({
+  "id": zod.number(),
+  "customerId": zod.number().nullish(),
+  "customerName": zod.string().nullish(),
+  "totalAmount": zod.number(),
+  "paidAmount": zod.number(),
+  "balanceAmount": zod.number(),
+  "changeAmount": zod.number(),
+  "status": zod.enum(['open', 'completed', 'cancelled', 'expired', 'voided']),
+  "expiresAt": zod.string(),
+  "completedAt": zod.string().nullish(),
+  "createdAt": zod.string()
+}).and(zod.object({
+  "subtotal": zod.number(),
+  "discountAmount": zod.number(),
+  "items": zod.array(zod.object({
+  "productId": zod.number(),
+  "productName": zod.string(),
+  "sku": zod.string(),
+  "quantity": zod.number(),
+  "unitPrice": zod.number(),
+  "totalPrice": zod.number()
+})),
+  "payments": zod.array(zod.object({
+  "id": zod.number(),
+  "checkoutId": zod.number().nullish(),
+  "method": zod.enum(['cash', 'mpesa']),
+  "amount": zod.number(),
+  "appliedAmount": zod.number(),
+  "changeAmount": zod.number(),
+  "status": zod.enum(['pending', 'unmatched', 'attached', 'failed', 'refund_required']),
+  "source": zod.enum(['manual', 'c2b', 'stk']),
+  "referenceCode": zod.string().nullish(),
+  "checkoutRequestId": zod.string().nullish(),
+  "payerName": zod.string().nullish(),
+  "payerPhone": zod.string().nullish(),
+  "receivedAt": zod.string()
+}))
+}))
+
+
+/**
+ * @summary Manager void with refund-required payments
+ */
+export const VoidCheckoutParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const VoidCheckoutResponse = zod.object({
+  "id": zod.number(),
+  "customerId": zod.number().nullish(),
+  "customerName": zod.string().nullish(),
+  "totalAmount": zod.number(),
+  "paidAmount": zod.number(),
+  "balanceAmount": zod.number(),
+  "changeAmount": zod.number(),
+  "status": zod.enum(['open', 'completed', 'cancelled', 'expired', 'voided']),
+  "expiresAt": zod.string(),
+  "completedAt": zod.string().nullish(),
+  "createdAt": zod.string()
+}).and(zod.object({
+  "subtotal": zod.number(),
+  "discountAmount": zod.number(),
+  "items": zod.array(zod.object({
+  "productId": zod.number(),
+  "productName": zod.string(),
+  "sku": zod.string(),
+  "quantity": zod.number(),
+  "unitPrice": zod.number(),
+  "totalPrice": zod.number()
+})),
+  "payments": zod.array(zod.object({
+  "id": zod.number(),
+  "checkoutId": zod.number().nullish(),
+  "method": zod.enum(['cash', 'mpesa']),
+  "amount": zod.number(),
+  "appliedAmount": zod.number(),
+  "changeAmount": zod.number(),
+  "status": zod.enum(['pending', 'unmatched', 'attached', 'failed', 'refund_required']),
+  "source": zod.enum(['manual', 'c2b', 'stk']),
+  "referenceCode": zod.string().nullish(),
+  "checkoutRequestId": zod.string().nullish(),
+  "payerName": zod.string().nullish(),
+  "payerPhone": zod.string().nullish(),
+  "receivedAt": zod.string()
+}))
+}))
+
+
+/**
+ * @summary Get checkout receipt with all attached payments
+ */
+export const GetCheckoutReceiptParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetCheckoutReceiptResponse = zod.object({
+  "id": zod.number(),
+  "customerId": zod.number().nullish(),
+  "customerName": zod.string().nullish(),
+  "totalAmount": zod.number(),
+  "paidAmount": zod.number(),
+  "balanceAmount": zod.number(),
+  "changeAmount": zod.number(),
+  "status": zod.enum(['open', 'completed', 'cancelled', 'expired', 'voided']),
+  "expiresAt": zod.string(),
+  "completedAt": zod.string().nullish(),
+  "createdAt": zod.string()
+}).and(zod.object({
+  "subtotal": zod.number(),
+  "discountAmount": zod.number(),
+  "items": zod.array(zod.object({
+  "productId": zod.number(),
+  "productName": zod.string(),
+  "sku": zod.string(),
+  "quantity": zod.number(),
+  "unitPrice": zod.number(),
+  "totalPrice": zod.number()
+})),
+  "payments": zod.array(zod.object({
+  "id": zod.number(),
+  "checkoutId": zod.number().nullish(),
+  "method": zod.enum(['cash', 'mpesa']),
+  "amount": zod.number(),
+  "appliedAmount": zod.number(),
+  "changeAmount": zod.number(),
+  "status": zod.enum(['pending', 'unmatched', 'attached', 'failed', 'refund_required']),
+  "source": zod.enum(['manual', 'c2b', 'stk']),
+  "referenceCode": zod.string().nullish(),
+  "checkoutRequestId": zod.string().nullish(),
+  "payerName": zod.string().nullish(),
+  "payerPhone": zod.string().nullish(),
+  "receivedAt": zod.string()
+}))
+})).and(zod.object({
+  "pharmacy": zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "address": zod.string().nullish(),
+  "phone": zod.string().nullish(),
+  "email": zod.string().nullish(),
+  "planType": zod.string(),
+  "planValue": zod.number(),
+  "status": zod.string()
+}),
+  "cashierName": zod.string()
+}))
+
+
+/**
+ * @summary Attach cash to an open checkout
+ */
+export const AttachCashPaymentBody = zod.object({
+  "checkoutId": zod.number(),
+  "amount": zod.number()
+})
+
+
+/**
+ * @summary List suggested unmatched M-PESA payments for an open checkout
+ */
+export const ListUnmatchedPaymentsQueryParams = zod.object({
+  "checkoutId": zod.coerce.number()
+})
+
+export const ListUnmatchedPaymentsResponseItem = zod.object({
+  "id": zod.number(),
+  "checkoutId": zod.number().nullish(),
+  "method": zod.enum(['cash', 'mpesa']),
+  "amount": zod.number(),
+  "appliedAmount": zod.number(),
+  "changeAmount": zod.number(),
+  "status": zod.enum(['pending', 'unmatched', 'attached', 'failed', 'refund_required']),
+  "source": zod.enum(['manual', 'c2b', 'stk']),
+  "referenceCode": zod.string().nullish(),
+  "checkoutRequestId": zod.string().nullish(),
+  "payerName": zod.string().nullish(),
+  "payerPhone": zod.string().nullish(),
+  "receivedAt": zod.string()
+})
+export const ListUnmatchedPaymentsResponse = zod.array(ListUnmatchedPaymentsResponseItem)
+
+
+/**
+ * @summary Cashier-confirm and attach an unmatched M-PESA payment
+ */
+export const AttachMpesaPaymentParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const AttachMpesaPaymentBody = zod.object({
+  "checkoutId": zod.number()
+})
+
+export const AttachMpesaPaymentResponse = zod.object({
+  "success": zod.boolean()
+})
+
+
+/**
+ * @summary Initiate an M-PESA STK Push for an open checkout
+ */
+export const InitiateMpesaPaymentBody = zod.object({
+  "checkoutId": zod.number(),
+  "phone": zod.string(),
+  "amount": zod.number()
+})
+
+export const InitiateMpesaPaymentResponse = zod.object({
+  "checkoutRequestId": zod.string()
+})
+
+
+/**
+ * @summary Stream persisted-ledger payment arrival notifications
+ */
+export const StreamPaymentEventsQueryParams = zod.object({
+  "token": zod.coerce.string()
+})
+
+
+/**
+ * @summary Safaricom C2B validation callback
+ */
+export const ValidateC2bPaymentParams = zod.object({
+  "token": zod.coerce.string()
+})
+
+export const ValidateC2bPaymentBody = zod.record(zod.string(), zod.unknown())
+
+
+/**
+ * @summary Idempotent Safaricom C2B confirmation callback
+ */
+export const ConfirmC2bPaymentParams = zod.object({
+  "token": zod.coerce.string()
+})
+
+export const ConfirmC2bPaymentBody = zod.record(zod.string(), zod.unknown())
+
+
+/**
+ * @summary Idempotent M-PESA Express result callback
+ */
+export const ReceiveStkCallbackParams = zod.object({
+  "token": zod.coerce.string()
+})
+
+export const ReceiveStkCallbackBody = zod.record(zod.string(), zod.unknown())
+
+
+/**
+ * @summary List staff in the current pharmacy
+ */
+export const ListStaffResponseItem = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "email": zod.string(),
+  "phone": zod.string(),
+  "role": zod.enum(['pharmacy_owner', 'manager', 'cashier']),
+  "isActive": zod.boolean(),
+  "createdAt": zod.string()
+})
+export const ListStaffResponse = zod.array(ListStaffResponseItem)
+
+
+/**
+ * @summary Create a pharmacy staff member
+ */
+export const CreateStaffMemberBody = zod.object({
+  "name": zod.string(),
+  "email": zod.string(),
+  "phone": zod.string(),
+  "password": zod.string(),
+  "role": zod.enum(['manager', 'cashier']).optional()
+})
+
+
+/**
+ * @summary Update a pharmacy staff member
+ */
+export const UpdateStaffMemberParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateStaffMemberBody = zod.object({
+  "name": zod.string().optional(),
+  "email": zod.string().optional(),
+  "phone": zod.string().optional(),
+  "password": zod.string().optional(),
+  "role": zod.enum(['manager', 'cashier']).optional(),
+  "isActive": zod.boolean().optional()
+})
+
+export const UpdateStaffMemberResponse = zod.object({
+  "success": zod.boolean()
 })
 
 
@@ -614,7 +828,6 @@ export const GetDashboardSummaryResponse = zod.object({
   "totalProducts": zod.number(),
   "lowStockCount": zod.number(),
   "outOfStockCount": zod.number(),
-  "totalCustomers": zod.number(),
   "avgTransactionValue": zod.number().optional()
 })
 
@@ -690,9 +903,18 @@ export const ListMessagesResponseItem = zod.object({
   "id": zod.number(),
   "title": zod.string(),
   "content": zod.string(),
-  "recipientType": zod.enum(['all', 'loyalty', 'inactive', 'custom']).optional(),
+  "recipientType": zod.enum(['all', 'this_week', 'range', 'transactional_hashed']),
   "recipientCount": zod.number(),
-  "status": zod.enum(['draft', 'sent', 'scheduled']),
+  "characterCount": zod.number(),
+  "segmentCount": zod.number(),
+  "estimatedCost": zod.number(),
+  "actualCost": zod.number(),
+  "sentCount": zod.number(),
+  "deliveredCount": zod.number(),
+  "failedCount": zod.number(),
+  "status": zod.enum(['queued', 'processing', 'sent', 'delivered', 'failed', 'partially_failed']),
+  "dateFrom": zod.string().nullish(),
+  "dateTo": zod.string().nullish(),
   "scheduledAt": zod.string().nullish(),
   "sentAt": zod.string().nullish(),
   "createdAt": zod.string()
@@ -706,9 +928,9 @@ export const ListMessagesResponse = zod.array(ListMessagesResponseItem)
 export const SendMessageBody = zod.object({
   "title": zod.string(),
   "content": zod.string(),
-  "recipientType": zod.enum(['all', 'loyalty', 'inactive', 'custom']),
-  "recipientIds": zod.array(zod.number()).optional(),
-  "scheduledAt": zod.string().optional()
+  "recipientType": zod.enum(['all', 'this_week', 'range']),
+  "dateFrom": zod.string().optional(),
+  "dateTo": zod.string().optional()
 })
 
 
@@ -723,12 +945,149 @@ export const GetMessageResponse = zod.object({
   "id": zod.number(),
   "title": zod.string(),
   "content": zod.string(),
-  "recipientType": zod.enum(['all', 'loyalty', 'inactive', 'custom']).optional(),
+  "recipientType": zod.enum(['all', 'this_week', 'range', 'transactional_hashed']),
   "recipientCount": zod.number(),
-  "status": zod.enum(['draft', 'sent', 'scheduled']),
+  "characterCount": zod.number(),
+  "segmentCount": zod.number(),
+  "estimatedCost": zod.number(),
+  "actualCost": zod.number(),
+  "sentCount": zod.number(),
+  "deliveredCount": zod.number(),
+  "failedCount": zod.number(),
+  "status": zod.enum(['queued', 'processing', 'sent', 'delivered', 'failed', 'partially_failed']),
+  "dateFrom": zod.string().nullish(),
+  "dateTo": zod.string().nullish(),
   "scheduledAt": zod.string().nullish(),
   "sentAt": zod.string().nullish(),
   "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Get SMS wallet, rate, gateway, and sales-contact summary
+ */
+export const GetSmsSummaryResponse = zod.object({
+  "balance": zod.number(),
+  "unitRate": zod.number(),
+  "availableUnits": zod.number(),
+  "pendingTopUp": zod.number(),
+  "pendingUnits": zod.number(),
+  "salesContacts": zod.number(),
+  "gatewayEnabled": zod.boolean()
+})
+
+
+/**
+ * @summary Count unique M-PESA contacts from completed sales
+ */
+export const EstimateMessageRecipientsQueryParams = zod.object({
+  "recipientType": zod.enum(['all', 'this_week', 'range']),
+  "dateFrom": zod.coerce.string().optional(),
+  "dateTo": zod.coerce.string().optional()
+})
+
+export const EstimateMessageRecipientsResponse = zod.object({
+  "count": zod.number()
+})
+
+
+/**
+ * @summary Quote a sales-contact SMS campaign before billing
+ */
+export const QuoteMessageCampaignBody = zod.object({
+  "content": zod.string(),
+  "recipientType": zod.enum(['all', 'this_week', 'range']),
+  "dateFrom": zod.string().nullish(),
+  "dateTo": zod.string().nullish()
+})
+
+export const QuoteMessageCampaignResponse = zod.object({
+  "recipientType": zod.string(),
+  "recipientCount": zod.number(),
+  "characterCount": zod.number(),
+  "segmentCount": zod.number(),
+  "unitsPerRecipient": zod.number(),
+  "totalUnits": zod.number(),
+  "unitBreakdown": zod.array(zod.object({
+  "unitsPerRecipient": zod.number(),
+  "recipients": zod.number(),
+  "totalUnits": zod.number()
+})),
+  "unitRate": zod.number(),
+  "amountKes": zod.number(),
+  "walletBalance": zod.number(),
+  "walletShortfall": zod.number(),
+  "pendingTopUp": zod.number(),
+  "pendingUnits": zod.number(),
+  "gatewayEnabled": zod.boolean(),
+  "canSend": zod.boolean(),
+  "unsupported": zod.array(zod.string())
+})
+
+
+/**
+ * @summary List per-recipient provider and delivery states
+ */
+export const ListMessageRecipientsParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ListMessageRecipientsResponseItem = zod.object({
+  "id": zod.number(),
+  "messageId": zod.number(),
+  "pharmacyId": zod.number(),
+  "paymentId": zod.number().nullish(),
+  "recipientName": zod.string().nullish(),
+  "phone": zod.string(),
+  "isHashed": zod.number(),
+  "providerMessageId": zod.string().nullish(),
+  "providerNetworkId": zod.string().nullish(),
+  "responseCode": zod.string().nullish(),
+  "responseDescription": zod.string().nullish(),
+  "status": zod.string(),
+  "cost": zod.number(),
+  "createdAt": zod.string()
+})
+export const ListMessageRecipientsResponse = zod.array(ListMessageRecipientsResponseItem)
+
+
+/**
+ * @summary Fetch unresolved delivery states from the configured gateway
+ */
+export const RefreshMessageStatusParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const RefreshMessageStatusResponse = zod.object({
+  "success": zod.boolean()
+})
+
+
+/**
+ * @summary Request an SMS wallet top-up
+ */
+export const RequestSmsWalletTopUpBody = zod.object({
+  "amount": zod.number()
+})
+
+
+/**
+ * @summary Receive a provider delivery callback
+ */
+export const ReceiveSmsDlrParams = zod.object({
+  "token": zod.coerce.string()
+})
+
+export const ReceiveSmsDlrBody = zod.record(zod.string(), zod.unknown())
+
+
+/**
+ * @summary Send a transactional SMS to a Safaricom hashed number
+ */
+export const SendTransactionalHashedSmsBody = zod.object({
+  "mobile": zod.string(),
+  "message": zod.string(),
+  "title": zod.string().optional()
 })
 
 

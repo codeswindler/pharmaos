@@ -11,7 +11,6 @@ export type MessageInputRecipientType = typeof MessageInputRecipientType[keyof t
 
 export const MessageInputRecipientType = {
   all: 'all',
-  loyalty: 'loyalty',
-  inactive: 'inactive',
-  custom: 'custom',
+  this_week: 'this_week',
+  range: 'range',
 } as const;

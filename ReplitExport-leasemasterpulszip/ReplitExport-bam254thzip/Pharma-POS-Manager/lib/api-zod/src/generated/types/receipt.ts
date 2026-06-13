@@ -5,25 +5,10 @@
  * PharmaPOS API specification
  * OpenAPI spec version: 0.1.0
  */
-import type { TransactionItem } from './transactionItem';
+import type { Checkout } from './checkout';
+import type { Pharmacy } from './pharmacy';
 
-export interface Receipt {
-  transactionId: number;
-  storeName?: string;
-  storeAddress?: string;
-  storePhone?: string;
-  cashierName?: string;
-  /** @nullable */
-  customerName?: string | null;
-  items: TransactionItem[];
-  subtotal?: number;
-  discountAmount?: number;
-  taxAmount?: number;
-  totalAmount: number;
-  paidAmount: number;
-  changeAmount: number;
-  paymentMethod: string;
-  /** @nullable */
-  referenceCode?: string | null;
-  createdAt: string;
-}
+export type Receipt = Checkout & {
+  pharmacy: Pharmacy;
+  cashierName: string;
+};

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, productsTable } from "@workspace/db";
-import { eq, ilike, or, lte, and } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import {
   ListProductsQueryParams,
   CreateProductBody,
@@ -9,6 +9,7 @@ import {
   UpdateProductBody,
   DeleteProductParams,
 } from "@workspace/api-zod";
+import { getPharmacyId, requireManagement } from "../middleware/auth";
 
 const router = Router();
 
@@ -20,8 +21,9 @@ router.get("/", async (req, res) => {
   }
 
   const { search, category, lowStock } = query.data;
+  const pharmacyId = getPharmacyId(req);
 
-  const conditions: ReturnType<typeof eq>[] = [];
+  const conditions: ReturnType<typeof eq>[] = [eq(productsTable.pharmacyId, pharmacyId)];
   if (category) conditions.push(eq(productsTable.category, category));
   if (lowStock === true || lowStock === "true" as unknown) {
     // We'll filter in JS after fetching
@@ -54,7 +56,7 @@ router.get("/", async (req, res) => {
     category: p.category,
     price: Number(p.price),
     costPrice: p.costPrice ? Number(p.costPrice) : null,
-    stockQty: p.stockQty,
+    stockQty: p.stockQty - p.reservedQty,
     lowStockThreshold: p.lowStockThreshold,
     unit: p.unit,
     manufacturer: p.manufacturer,
@@ -67,18 +69,21 @@ router.get("/", async (req, res) => {
   res.json(result);
 });
 
-router.post("/", async (req, res) => {
+router.post("/", requireManagement, async (req, res) => {
   const body = CreateProductBody.safeParse(req.body);
   if (!body.success) {
     res.status(400).json({ error: "Invalid body", details: body.error.issues });
     return;
   }
 
-  const [product] = await db.insert(productsTable).values({
+  const pharmacyId = getPharmacyId(req);
+  const [{ id }] = await db.insert(productsTable).values({
+    pharmacyId,
     ...body.data,
     price: String(body.data.price),
     costPrice: body.data.costPrice ? String(body.data.costPrice) : null,
-  }).returning();
+  }).$returningId();
+  const [product] = await db.select().from(productsTable).where(eq(productsTable.id, id));
 
   res.status(201).json({
     id: product.id,
@@ -101,7 +106,7 @@ router.post("/", async (req, res) => {
 });
 
 router.get("/categories", async (req, res) => {
-  const rows = await db.selectDistinct({ category: productsTable.category }).from(productsTable);
+  const rows = await db.selectDistinct({ category: productsTable.category }).from(productsTable).where(eq(productsTable.pharmacyId, getPharmacyId(req)));
   res.json(rows.map((r) => r.category).filter(Boolean).sort());
 });
 
@@ -112,7 +117,7 @@ router.get("/:id", async (req, res) => {
     return;
   }
 
-  const [product] = await db.select().from(productsTable).where(eq(productsTable.id, params.data.id));
+  const [product] = await db.select().from(productsTable).where(and(eq(productsTable.id, params.data.id), eq(productsTable.pharmacyId, getPharmacyId(req))));
   if (!product) {
     res.status(404).json({ error: "Product not found" });
     return;
@@ -138,7 +143,7 @@ router.get("/:id", async (req, res) => {
   });
 });
 
-router.patch("/:id", async (req, res) => {
+router.patch("/:id", requireManagement, async (req, res) => {
   const params = UpdateProductParams.safeParse({ id: Number(req.params.id) });
   const body = UpdateProductBody.safeParse(req.body);
   if (!params.success || !body.success) {
@@ -150,7 +155,9 @@ router.patch("/:id", async (req, res) => {
   if (body.data.price !== undefined) updateData.price = String(body.data.price);
   if (body.data.costPrice !== undefined) updateData.costPrice = body.data.costPrice ? String(body.data.costPrice) : null;
 
-  const [product] = await db.update(productsTable).set(updateData).where(eq(productsTable.id, params.data.id)).returning();
+  const scope = and(eq(productsTable.id, params.data.id), eq(productsTable.pharmacyId, getPharmacyId(req)));
+  await db.update(productsTable).set(updateData).where(scope);
+  const [product] = await db.select().from(productsTable).where(scope);
   if (!product) {
     res.status(404).json({ error: "Product not found" });
     return;
@@ -176,13 +183,13 @@ router.patch("/:id", async (req, res) => {
   });
 });
 
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", requireManagement, async (req, res) => {
   const params = DeleteProductParams.safeParse({ id: Number(req.params.id) });
   if (!params.success) {
     res.status(400).json({ error: "Invalid id" });
     return;
   }
-  await db.delete(productsTable).where(eq(productsTable.id, params.data.id));
+  await db.delete(productsTable).where(and(eq(productsTable.id, params.data.id), eq(productsTable.pharmacyId, getPharmacyId(req))));
   res.status(204).send();
 });
 

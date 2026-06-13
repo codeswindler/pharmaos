@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { PharmaPOSLogo } from "@/components/layout/PharmaPOSLogo";
 import {
-  ShoppingCart, Package, CreditCard, BarChart3, Users, MessageSquare,
+  ShoppingCart, Package, CreditCard, BarChart3, ReceiptText, MessageSquare,
   ChevronRight, Eye, EyeOff, Loader2, CheckCircle2
 } from "lucide-react";
 
@@ -11,9 +11,9 @@ const FEATURES = [
   { icon: ShoppingCart, label: "Point of Sale", desc: "Fast, touch-friendly checkout with barcode scanning" },
   { icon: Package, label: "Inventory Management", desc: "Real-time stock tracking with low-stock alerts" },
   { icon: CreditCard, label: "M-PESA & Cash Payments", desc: "Integrated M-PESA STK push and cash handling" },
-  { icon: Users, label: "Customer CRM", desc: "Customer profiles, purchase history, loyalty tracking" },
+  { icon: ReceiptText, label: "Payment Ledger", desc: "Complete sales, split-payment, and receipt history" },
   { icon: BarChart3, label: "Analytics & Reports", desc: "Revenue trends, top products, performance insights" },
-  { icon: MessageSquare, label: "SMS Campaigns", desc: "Bulk SMS and email campaigns to your customers" },
+  { icon: MessageSquare, label: "SMS Campaigns", desc: "Reach contacts captured automatically from M-PESA sales" },
 ];
 
 const STATS = [
@@ -25,7 +25,7 @@ const STATS = [
 export default function LoginPage() {
   const [, navigate] = useLocation();
   const { login } = useAuth();
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -36,12 +36,8 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
     try {
-      await login(email, password);
-      const token = localStorage.getItem("pharmaos_token");
-      if (!token) { setError("Login failed"); return; }
-      const res = await fetch("/api/auth/me", { headers: { Authorization: `Bearer ${token}` } });
-      const { user } = await res.json();
-      if (user.role === "admin") navigate("/admin");
+      const user = await login(identifier, password);
+      if (user.role === "super_admin") navigate("/admin");
       else navigate("/");
     } catch (err: any) {
       setError(err.message || "Invalid credentials");
@@ -92,7 +88,7 @@ export default function LoginPage() {
             </span>
           </h1>
           <p className="text-white/55 text-lg leading-relaxed max-w-md">
-            Run your pharmacy smarter — from dispensing to payments, inventory to customer care, all in one seamless platform built for Kenyan pharmacies.
+            Run your pharmacy smarter — from dispensing to payments, inventory to sales outreach, all in one seamless platform built for Kenyan pharmacies.
           </p>
         </div>
 
@@ -139,12 +135,11 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs font-medium text-white/60 mb-1.5 uppercase tracking-wider">Email address</label>
+              <label className="block text-xs font-medium text-white/60 mb-1.5 uppercase tracking-wider">Email or phone</label>
               <input
-                type="email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                placeholder="you@pharmacy.co.ke"
+                value={identifier}
+                onChange={e => setIdentifier(e.target.value)}
+                placeholder="you@pharmacy.co.ke or 0712 345 678"
                 required
                 className="w-full px-4 py-3 rounded-xl text-sm text-white placeholder-white/25 outline-none transition-all"
                 style={{
@@ -209,7 +204,7 @@ export default function LoginPage() {
             </div>
             <div className="flex items-start gap-2 text-xs text-white/35">
               <CheckCircle2 size={12} className="text-green-400/60 mt-0.5 flex-shrink-0" />
-              <span>Hospital accounts go directly to the POS dashboard</span>
+              <span>Pharmacy staff go directly to their shop dashboard</span>
             </div>
           </div>
 

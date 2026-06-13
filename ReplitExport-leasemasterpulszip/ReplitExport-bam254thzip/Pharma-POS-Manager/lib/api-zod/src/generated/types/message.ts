@@ -12,9 +12,20 @@ export interface Message {
   id: number;
   title: string;
   content: string;
-  recipientType?: MessageRecipientType;
+  recipientType: MessageRecipientType;
   recipientCount: number;
+  characterCount: number;
+  segmentCount: number;
+  estimatedCost: number;
+  actualCost: number;
+  sentCount: number;
+  deliveredCount: number;
+  failedCount: number;
   status: MessageStatus;
+  /** @nullable */
+  dateFrom?: string | null;
+  /** @nullable */
+  dateTo?: string | null;
   /** @nullable */
   scheduledAt?: string | null;
   /** @nullable */

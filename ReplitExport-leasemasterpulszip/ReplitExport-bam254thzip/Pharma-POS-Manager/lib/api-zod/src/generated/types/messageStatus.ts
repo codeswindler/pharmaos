@@ -10,7 +10,10 @@ export type MessageStatus = typeof MessageStatus[keyof typeof MessageStatus];
 
 
 export const MessageStatus = {
-  draft: 'draft',
+  queued: 'queued',
+  processing: 'processing',
   sent: 'sent',
-  scheduled: 'scheduled',
+  delivered: 'delivered',
+  failed: 'failed',
+  partially_failed: 'partially_failed',
 } as const;

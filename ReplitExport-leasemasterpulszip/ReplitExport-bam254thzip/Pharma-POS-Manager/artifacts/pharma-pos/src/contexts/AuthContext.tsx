@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
+import { setAuthTokenGetter } from "@workspace/api-client-react";
 
 const API_BASE = "/api";
 
@@ -6,11 +7,12 @@ export interface AuthUser {
   id: number;
   name: string;
   email: string;
-  role: "admin" | "client";
-  hospitalId: number | null;
+  phone: string;
+  role: "super_admin" | "pharmacy_owner" | "manager" | "cashier";
+  pharmacyId: number | null;
 }
 
-export interface AuthHospital {
+export interface AuthPharmacy {
   id: number;
   name: string;
   planType: string;
@@ -20,48 +22,50 @@ export interface AuthHospital {
 
 interface AuthState {
   user: AuthUser | null;
-  hospital: AuthHospital | null;
+  pharmacy: AuthPharmacy | null;
   token: string | null;
   loading: boolean;
 }
 
 interface AuthContextType extends AuthState {
-  login: (email: string, password: string) => Promise<void>;
+  login: (identifier: string, password: string) => Promise<AuthUser>;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<AuthState>({ user: null, hospital: null, token: null, loading: true });
+  const [state, setState] = useState<AuthState>({ user: null, pharmacy: null, token: null, loading: true });
 
   useEffect(() => {
+    setAuthTokenGetter(() => localStorage.getItem("pharmaos_token"));
     const token = localStorage.getItem("pharmaos_token");
     if (!token) { setState(s => ({ ...s, loading: false })); return; }
     fetch(`${API_BASE}/auth/me`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.ok ? r.json() : Promise.reject())
-      .then(({ user, hospital }) => setState({ user, hospital, token, loading: false }))
-      .catch(() => { localStorage.removeItem("pharmaos_token"); setState({ user: null, hospital: null, token: null, loading: false }); });
+      .then(({ user, pharmacy }) => setState({ user, pharmacy, token, loading: false }))
+      .catch(() => { localStorage.removeItem("pharmaos_token"); setState({ user: null, pharmacy: null, token: null, loading: false }); });
   }, []);
 
-  const login = async (email: string, password: string) => {
+  const login = async (identifier: string, password: string) => {
     const res = await fetch(`${API_BASE}/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ identifier, password }),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error((err as any).error || "Login failed");
     }
-    const { token, user, hospital } = await res.json();
+    const { token, user, pharmacy } = await res.json();
     localStorage.setItem("pharmaos_token", token);
-    setState({ user, hospital, token, loading: false });
+    setState({ user, pharmacy, token, loading: false });
+    return user;
   };
 
   const logout = () => {
     localStorage.removeItem("pharmaos_token");
-    setState({ user: null, hospital: null, token: null, loading: false });
+    setState({ user: null, pharmacy: null, token: null, loading: false });
   };
 
   return <AuthContext.Provider value={{ ...state, login, logout }}>{children}</AuthContext.Provider>;

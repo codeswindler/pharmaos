@@ -1,11 +1,12 @@
 import { Router } from "express";
 import { db, productsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import {
   ListInventoryQueryParams,
   AdjustStockParams,
   AdjustStockBody,
 } from "@workspace/api-zod";
+import { getPharmacyId, requireManagement } from "../middleware/auth";
 
 const router = Router();
 
@@ -22,7 +23,7 @@ router.get("/", async (req, res) => {
     return;
   }
 
-  let rows = await db.select().from(productsTable).orderBy(productsTable.name);
+  let rows = await db.select().from(productsTable).where(eq(productsTable.pharmacyId, getPharmacyId(req))).orderBy(productsTable.name);
 
   if (query.data.lowStock === true || (query.data.lowStock as unknown) === "true") {
     rows = rows.filter((p) => p.stockQty <= p.lowStockThreshold);
@@ -41,7 +42,7 @@ router.get("/", async (req, res) => {
   })));
 });
 
-router.post("/:productId/adjust", async (req, res) => {
+router.post("/:productId/adjust", requireManagement, async (req, res) => {
   const params = AdjustStockParams.safeParse({ productId: Number(req.params.productId) });
   const body = AdjustStockBody.safeParse(req.body);
   if (!params.success || !body.success) {
@@ -49,7 +50,8 @@ router.post("/:productId/adjust", async (req, res) => {
     return;
   }
 
-  const [product] = await db.select().from(productsTable).where(eq(productsTable.id, params.data.productId));
+  const scope = and(eq(productsTable.id, params.data.productId), eq(productsTable.pharmacyId, getPharmacyId(req)));
+  const [product] = await db.select().from(productsTable).where(scope);
   if (!product) {
     res.status(404).json({ error: "Product not found" });
     return;
@@ -60,10 +62,10 @@ router.post("/:productId/adjust", async (req, res) => {
   else if (body.data.type === "subtract") newQty = Math.max(0, newQty - body.data.quantity);
   else if (body.data.type === "set") newQty = body.data.quantity;
 
-  const [updated] = await db.update(productsTable)
+  await db.update(productsTable)
     .set({ stockQty: newQty })
-    .where(eq(productsTable.id, params.data.productId))
-    .returning();
+    .where(scope);
+  const [updated] = await db.select().from(productsTable).where(scope);
 
   res.json({
     productId: updated.id,

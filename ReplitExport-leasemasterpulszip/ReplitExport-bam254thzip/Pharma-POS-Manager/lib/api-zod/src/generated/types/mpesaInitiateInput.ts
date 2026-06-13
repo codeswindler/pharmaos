@@ -5,12 +5,9 @@
  * PharmaPOS API specification
  * OpenAPI spec version: 0.1.0
  */
-import type { CartItem } from './cartItem';
 
 export interface MpesaInitiateInput {
+  checkoutId: number;
   phone: string;
   amount: number;
-  customerName?: string;
-  cartItems: CartItem[];
-  discountAmount?: number;
 }

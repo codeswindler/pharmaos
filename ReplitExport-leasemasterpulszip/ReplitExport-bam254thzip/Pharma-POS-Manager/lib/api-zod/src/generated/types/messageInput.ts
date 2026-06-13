@@ -11,6 +11,6 @@ export interface MessageInput {
   title: string;
   content: string;
   recipientType: MessageInputRecipientType;
-  recipientIds?: number[];
-  scheduledAt?: string;
+  dateFrom?: string;
+  dateTo?: string;
 }

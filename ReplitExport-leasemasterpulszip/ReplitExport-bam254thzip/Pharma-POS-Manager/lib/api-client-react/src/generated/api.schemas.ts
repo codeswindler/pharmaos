@@ -5,6 +5,171 @@
  * PharmaPOS API specification
  * OpenAPI spec version: 0.1.0
  */
+export interface LoginInput {
+  identifier: string;
+  password: string;
+}
+
+export type AuthUserRole = typeof AuthUserRole[keyof typeof AuthUserRole];
+
+
+export const AuthUserRole = {
+  super_admin: 'super_admin',
+  pharmacy_owner: 'pharmacy_owner',
+  manager: 'manager',
+  cashier: 'cashier',
+} as const;
+
+export interface AuthUser {
+  id: number;
+  name: string;
+  email: string;
+  phone: string;
+  role: AuthUserRole;
+  /** @nullable */
+  pharmacyId?: number | null;
+}
+
+export interface Pharmacy {
+  id: number;
+  name: string;
+  /** @nullable */
+  address?: string | null;
+  /** @nullable */
+  phone?: string | null;
+  /** @nullable */
+  email?: string | null;
+  planType: string;
+  planValue: number;
+  status: string;
+}
+
+export interface AuthResponse {
+  token: string;
+  user: AuthUser;
+  pharmacy?: Pharmacy | null;
+}
+
+export interface AuthMeResponse {
+  user: AuthUser;
+  pharmacy?: Pharmacy | null;
+}
+
+export interface PharmacyInput {
+  name: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  planType?: string;
+  planValue?: number;
+  ownerName: string;
+  ownerEmail: string;
+  ownerPhone: string;
+  ownerPassword: string;
+}
+
+export interface PharmacyUpdate {
+  name?: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  planType?: string;
+  planValue?: number;
+  status?: string;
+}
+
+export interface CreatePharmacyResponse {
+  pharmacyId: number;
+  ownerId: number;
+}
+
+export type MpesaConfigEnvironment = typeof MpesaConfigEnvironment[keyof typeof MpesaConfigEnvironment];
+
+
+export const MpesaConfigEnvironment = {
+  sandbox: 'sandbox',
+  production: 'production',
+} as const;
+
+export type MpesaConfigTransactionType = typeof MpesaConfigTransactionType[keyof typeof MpesaConfigTransactionType];
+
+
+export const MpesaConfigTransactionType = {
+  CustomerPayBillOnline: 'CustomerPayBillOnline',
+  CustomerBuyGoodsOnline: 'CustomerBuyGoodsOnline',
+} as const;
+
+export type MpesaConfigRegistrationStatus = typeof MpesaConfigRegistrationStatus[keyof typeof MpesaConfigRegistrationStatus];
+
+
+export const MpesaConfigRegistrationStatus = {
+  not_registered: 'not_registered',
+  registered: 'registered',
+  failed: 'failed',
+} as const;
+
+export interface MpesaConfig {
+  environment: MpesaConfigEnvironment;
+  shortcode: string;
+  transactionType: MpesaConfigTransactionType;
+  enabled: boolean;
+  consumerKey?: string;
+  consumerSecret?: string;
+  /** @nullable */
+  passkey?: string | null;
+  registrationStatus: MpesaConfigRegistrationStatus;
+  /** @nullable */
+  credentialsVerifiedAt?: string | null;
+  /** @nullable */
+  callbacksRegisteredAt?: string | null;
+}
+
+export type MpesaConfigInputEnvironment = typeof MpesaConfigInputEnvironment[keyof typeof MpesaConfigInputEnvironment];
+
+
+export const MpesaConfigInputEnvironment = {
+  sandbox: 'sandbox',
+  production: 'production',
+} as const;
+
+export type MpesaConfigInputTransactionType = typeof MpesaConfigInputTransactionType[keyof typeof MpesaConfigInputTransactionType];
+
+
+export const MpesaConfigInputTransactionType = {
+  CustomerPayBillOnline: 'CustomerPayBillOnline',
+  CustomerBuyGoodsOnline: 'CustomerBuyGoodsOnline',
+} as const;
+
+export interface MpesaConfigInput {
+  environment?: MpesaConfigInputEnvironment;
+  shortcode: string;
+  transactionType?: MpesaConfigInputTransactionType;
+  consumerKey?: string;
+  consumerSecret?: string;
+  passkey?: string;
+  enabled?: boolean;
+}
+
+export interface MpesaConfigResponse {
+  success: boolean;
+  config?: MpesaConfig;
+}
+
+export interface MpesaCallbackPayload { [key: string]: unknown }
+
+export type AdminPharmacy = Pharmacy & ({
+  userCount: number;
+  mpesa?: MpesaConfig | null;
+});
+
+export interface AdminStats {
+  total: number;
+  active: number;
+  suspended: number;
+  monthlyRevenue: number;
+  totalUsers: number;
+}
+
 export interface HealthStatus {
   status: string;
 }
@@ -102,146 +267,198 @@ export interface StockAdjustment {
   reason?: string;
 }
 
-export interface Customer {
-  id: number;
-  name: string;
-  /** @nullable */
-  phone?: string | null;
-  /** @nullable */
-  email?: string | null;
-  loyaltyPoints?: number;
-  totalSpend?: number;
-  visitCount?: number;
-  createdAt: string;
-  /** @nullable */
-  lastVisit?: string | null;
-}
-
-export interface CustomerInput {
-  name: string;
-  phone?: string;
-  email?: string;
-}
-
-export interface CustomerUpdate {
-  name?: string;
-  phone?: string;
-  email?: string;
-}
-
-export type TransactionStatus = typeof TransactionStatus[keyof typeof TransactionStatus];
-
-
-export const TransactionStatus = {
-  pending: 'pending',
-  completed: 'completed',
-  refunded: 'refunded',
-  cancelled: 'cancelled',
-} as const;
-
-export type TransactionPaymentMethod = typeof TransactionPaymentMethod[keyof typeof TransactionPaymentMethod];
-
-
-export const TransactionPaymentMethod = {
-  cash: 'cash',
-  card: 'card',
-  mobile_money: 'mobile_money',
-  other: 'other',
-} as const;
-
-export interface TransactionItem {
+export interface CartItem {
   productId: number;
-  productName: string;
-  sku?: string;
   quantity: number;
-  unitPrice: number;
-  totalPrice: number;
 }
 
-export interface Transaction {
+export type CheckoutSummaryStatus = typeof CheckoutSummaryStatus[keyof typeof CheckoutSummaryStatus];
+
+
+export const CheckoutSummaryStatus = {
+  open: 'open',
+  completed: 'completed',
+  cancelled: 'cancelled',
+  expired: 'expired',
+  voided: 'voided',
+} as const;
+
+export interface CheckoutSummary {
   id: number;
   /** @nullable */
   customerId?: number | null;
   /** @nullable */
   customerName?: string | null;
   totalAmount: number;
-  discountAmount?: number;
-  taxAmount?: number;
-  paidAmount?: number;
-  changeAmount?: number;
-  status: TransactionStatus;
-  paymentMethod: TransactionPaymentMethod;
+  paidAmount: number;
+  balanceAmount: number;
+  changeAmount: number;
+  status: CheckoutSummaryStatus;
+  expiresAt: string;
   /** @nullable */
-  referenceCode?: string | null;
-  /** @nullable */
-  validationCode?: string | null;
-  isValidated?: boolean;
-  receiptPrinted?: boolean;
+  completedAt?: string | null;
   createdAt: string;
-  items: TransactionItem[];
 }
 
-export type TransactionInputPaymentMethod = typeof TransactionInputPaymentMethod[keyof typeof TransactionInputPaymentMethod];
+export interface CheckoutItem {
+  productId: number;
+  productName: string;
+  sku: string;
+  quantity: number;
+  unitPrice: number;
+  totalPrice: number;
+}
+
+export type PaymentMethod = typeof PaymentMethod[keyof typeof PaymentMethod];
 
 
-export const TransactionInputPaymentMethod = {
+export const PaymentMethod = {
   cash: 'cash',
-  card: 'card',
-  mobile_money: 'mobile_money',
-  other: 'other',
+  mpesa: 'mpesa',
 } as const;
 
-export interface CartItem {
-  productId: number;
-  quantity: number;
-}
+export type PaymentStatus = typeof PaymentStatus[keyof typeof PaymentStatus];
 
-export interface TransactionInput {
-  customerId?: number;
-  customerName?: string;
-  items: CartItem[];
-  paymentMethod: TransactionInputPaymentMethod;
-  paidAmount: number;
-  discountAmount?: number;
-  referenceCode?: string;
-}
 
-export interface PaymentConfirmation {
-  confirmed: boolean;
-  customerId?: number;
-  customerName?: string;
-}
+export const PaymentStatus = {
+  pending: 'pending',
+  unmatched: 'unmatched',
+  attached: 'attached',
+  failed: 'failed',
+  refund_required: 'refund_required',
+} as const;
 
-export interface ValidationCodeResponse {
-  message: string;
-  code?: string;
-  expiresIn: number;
-}
+export type PaymentSource = typeof PaymentSource[keyof typeof PaymentSource];
 
-export interface CodeValidationInput {
-  code: string;
-}
 
-export interface Receipt {
-  transactionId: number;
-  storeName?: string;
-  storeAddress?: string;
-  storePhone?: string;
-  cashierName?: string;
+export const PaymentSource = {
+  manual: 'manual',
+  c2b: 'c2b',
+  stk: 'stk',
+} as const;
+
+export interface Payment {
+  id: number;
   /** @nullable */
-  customerName?: string | null;
-  items: TransactionItem[];
-  subtotal?: number;
-  discountAmount?: number;
-  taxAmount?: number;
-  totalAmount: number;
-  paidAmount: number;
+  checkoutId?: number | null;
+  method: PaymentMethod;
+  amount: number;
+  appliedAmount: number;
   changeAmount: number;
-  paymentMethod: string;
+  status: PaymentStatus;
+  source: PaymentSource;
   /** @nullable */
   referenceCode?: string | null;
+  /** @nullable */
+  checkoutRequestId?: string | null;
+  /** @nullable */
+  payerName?: string | null;
+  /** @nullable */
+  payerPhone?: string | null;
+  receivedAt: string;
+}
+
+export type Checkout = CheckoutSummary & {
+  subtotal: number;
+  discountAmount: number;
+  items: CheckoutItem[];
+  payments: Payment[];
+};
+
+export interface CheckoutInput {
+  customerId?: number;
+  customerName?: string;
+  discountAmount?: number;
+  items: CartItem[];
+}
+
+export interface CashPaymentInput {
+  checkoutId: number;
+  amount: number;
+}
+
+export interface AttachPaymentInput {
+  checkoutId: number;
+}
+
+export interface MpesaInitiateInput {
+  checkoutId: number;
+  phone: string;
+  amount: number;
+}
+
+export interface MpesaInitiateResponse {
+  checkoutRequestId: string;
+}
+
+export type StaffMemberRole = typeof StaffMemberRole[keyof typeof StaffMemberRole];
+
+
+export const StaffMemberRole = {
+  pharmacy_owner: 'pharmacy_owner',
+  manager: 'manager',
+  cashier: 'cashier',
+} as const;
+
+export interface StaffMember {
+  id: number;
+  name: string;
+  email: string;
+  phone: string;
+  role: StaffMemberRole;
+  isActive: boolean;
   createdAt: string;
 }
+
+export type StaffInputRole = typeof StaffInputRole[keyof typeof StaffInputRole];
+
+
+export const StaffInputRole = {
+  manager: 'manager',
+  cashier: 'cashier',
+} as const;
+
+export interface StaffInput {
+  name: string;
+  email: string;
+  phone: string;
+  password: string;
+  role?: StaffInputRole;
+}
+
+export type StaffUpdateRole = typeof StaffUpdateRole[keyof typeof StaffUpdateRole];
+
+
+export const StaffUpdateRole = {
+  manager: 'manager',
+  cashier: 'cashier',
+} as const;
+
+export interface StaffUpdate {
+  name?: string;
+  email?: string;
+  phone?: string;
+  password?: string;
+  role?: StaffUpdateRole;
+  isActive?: boolean;
+}
+
+export interface IdResponse {
+  id: number;
+}
+
+export interface SuccessResponse {
+  success: boolean;
+}
+
+export interface ExpireResponse {
+  expired: number;
+}
+
+export type Receipt = Checkout & {
+  pharmacy: Pharmacy;
+  cashierName: string;
+};
 
 export interface DashboardSummary {
   todayRevenue: number;
@@ -254,7 +471,6 @@ export interface DashboardSummary {
   totalProducts: number;
   lowStockCount: number;
   outOfStockCount: number;
-  totalCustomers: number;
   avgTransactionValue?: number;
 }
 
@@ -310,70 +526,46 @@ export interface ActivityItem {
   timestamp: string;
 }
 
-export interface MpesaInitiateInput {
-  phone: string;
-  amount: number;
-  customerName?: string;
-  cartItems: CartItem[];
-  discountAmount?: number;
-}
-
-export interface MpesaInitiateResponse {
-  checkoutRequestId: string;
-  message: string;
-}
-
-export type MpesaStatusResponseStatus = typeof MpesaStatusResponseStatus[keyof typeof MpesaStatusResponseStatus];
-
-
-export const MpesaStatusResponseStatus = {
-  pending: 'pending',
-  completed: 'completed',
-  failed: 'failed',
-  timeout: 'timeout',
-} as const;
-
-export interface MpesaStatusResponse {
-  status: MpesaStatusResponseStatus;
-  /** @nullable */
-  transactionId?: number | null;
-  /** @nullable */
-  customerName?: string | null;
-  /** @nullable */
-  phone?: string | null;
-  /** @nullable */
-  amount?: number | null;
-  /** @nullable */
-  mpesaCode?: string | null;
-  message?: string;
-}
-
 export type MessageRecipientType = typeof MessageRecipientType[keyof typeof MessageRecipientType];
 
 
 export const MessageRecipientType = {
   all: 'all',
-  loyalty: 'loyalty',
-  inactive: 'inactive',
-  custom: 'custom',
+  this_week: 'this_week',
+  range: 'range',
+  transactional_hashed: 'transactional_hashed',
 } as const;
 
 export type MessageStatus = typeof MessageStatus[keyof typeof MessageStatus];
 
 
 export const MessageStatus = {
-  draft: 'draft',
+  queued: 'queued',
+  processing: 'processing',
   sent: 'sent',
-  scheduled: 'scheduled',
+  delivered: 'delivered',
+  failed: 'failed',
+  partially_failed: 'partially_failed',
 } as const;
 
 export interface Message {
   id: number;
   title: string;
   content: string;
-  recipientType?: MessageRecipientType;
+  recipientType: MessageRecipientType;
   recipientCount: number;
+  characterCount: number;
+  segmentCount: number;
+  estimatedCost: number;
+  actualCost: number;
+  sentCount: number;
+  deliveredCount: number;
+  failedCount: number;
   status: MessageStatus;
+  /** @nullable */
+  dateFrom?: string | null;
+  /** @nullable */
+  dateTo?: string | null;
   /** @nullable */
   scheduledAt?: string | null;
   /** @nullable */
@@ -386,17 +578,104 @@ export type MessageInputRecipientType = typeof MessageInputRecipientType[keyof t
 
 export const MessageInputRecipientType = {
   all: 'all',
-  loyalty: 'loyalty',
-  inactive: 'inactive',
-  custom: 'custom',
+  this_week: 'this_week',
+  range: 'range',
 } as const;
 
 export interface MessageInput {
   title: string;
   content: string;
   recipientType: MessageInputRecipientType;
-  recipientIds?: number[];
-  scheduledAt?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+export type MessageQuoteInputRecipientType = typeof MessageQuoteInputRecipientType[keyof typeof MessageQuoteInputRecipientType];
+
+
+export const MessageQuoteInputRecipientType = {
+  all: 'all',
+  this_week: 'this_week',
+  range: 'range',
+} as const;
+
+export interface MessageQuoteInput {
+  content: string;
+  recipientType: MessageQuoteInputRecipientType;
+  /** @nullable */
+  dateFrom?: string | null;
+  /** @nullable */
+  dateTo?: string | null;
+}
+
+export type MessageQuoteUnitBreakdownItem = {
+  unitsPerRecipient: number;
+  recipients: number;
+  totalUnits: number;
+};
+
+export interface MessageQuote {
+  recipientType: string;
+  recipientCount: number;
+  characterCount: number;
+  segmentCount: number;
+  unitsPerRecipient: number;
+  totalUnits: number;
+  unitBreakdown: MessageQuoteUnitBreakdownItem[];
+  unitRate: number;
+  amountKes: number;
+  walletBalance: number;
+  walletShortfall: number;
+  pendingTopUp: number;
+  pendingUnits: number;
+  gatewayEnabled: boolean;
+  canSend: boolean;
+  unsupported: string[];
+}
+
+export interface SmsSummary {
+  balance: number;
+  unitRate: number;
+  availableUnits: number;
+  pendingTopUp: number;
+  pendingUnits: number;
+  salesContacts: number;
+  gatewayEnabled: boolean;
+}
+
+export interface MessageRecipient {
+  id: number;
+  messageId: number;
+  pharmacyId: number;
+  /** @nullable */
+  paymentId?: number | null;
+  /** @nullable */
+  recipientName?: string | null;
+  phone: string;
+  isHashed: number;
+  /** @nullable */
+  providerMessageId?: string | null;
+  /** @nullable */
+  providerNetworkId?: string | null;
+  /** @nullable */
+  responseCode?: string | null;
+  /** @nullable */
+  responseDescription?: string | null;
+  status: string;
+  cost: number;
+  createdAt: string;
+}
+
+export interface SmsWalletTopUpInput {
+  amount: number;
+}
+
+export interface SmsDlrPayload { [key: string]: unknown }
+
+export interface TransactionalHashedSmsInput {
+  mobile: string;
+  message: string;
+  title?: string;
 }
 
 export type ListProductsParams = {
@@ -409,25 +688,13 @@ export type ListInventoryParams = {
 lowStock?: boolean;
 };
 
-export type ListCustomersParams = {
-search?: string;
+export type ListUnmatchedPaymentsParams = {
+checkoutId: number;
 };
 
-export type ListTransactionsParams = {
-from?: string;
-to?: string;
-status?: ListTransactionsStatus;
+export type StreamPaymentEventsParams = {
+token: string;
 };
-
-export type ListTransactionsStatus = typeof ListTransactionsStatus[keyof typeof ListTransactionsStatus];
-
-
-export const ListTransactionsStatus = {
-  pending: 'pending',
-  completed: 'completed',
-  refunded: 'refunded',
-  cancelled: 'cancelled',
-} as const;
 
 export type GetRevenueTrendParams = {
 period?: GetRevenueTrendPeriod;
@@ -454,4 +721,23 @@ export const GetTopProductsPeriod = {
   week: 'week',
   month: 'month',
 } as const;
+
+export type EstimateMessageRecipientsParams = {
+recipientType: EstimateMessageRecipientsRecipientType;
+dateFrom?: string;
+dateTo?: string;
+};
+
+export type EstimateMessageRecipientsRecipientType = typeof EstimateMessageRecipientsRecipientType[keyof typeof EstimateMessageRecipientsRecipientType];
+
+
+export const EstimateMessageRecipientsRecipientType = {
+  all: 'all',
+  this_week: 'this_week',
+  range: 'range',
+} as const;
+
+export type EstimateMessageRecipients200 = {
+  count: number;
+};
 
