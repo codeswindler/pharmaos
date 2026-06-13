@@ -1,8 +1,8 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import crypto from "node:crypto";
-import { credentialRevealAuditsTable, db, pharmaciesTable, usersTable, mpesaConfigsTable, smsWalletsTable, messagesTable, messageRecipientsTable } from "@workspace/db";
-import { count, desc, eq } from "drizzle-orm";
+import { credentialRevealAuditsTable, db, pool, pharmaciesTable, usersTable, mpesaConfigsTable, messagesTable, messageRecipientsTable } from "@workspace/db";
+import { and, count, desc, eq } from "drizzle-orm";
 import { requireSuperAdmin, type AuthenticatedRequest } from "../middleware/auth";
 import { decryptSecret, encryptSecret, maskSecret, normalizePhone } from "../lib/security";
 import { logger } from "../lib/logger";
@@ -39,14 +39,57 @@ const formatConfig = (config: typeof mpesaConfigsTable.$inferSelect | undefined)
   callbacksRegisteredAt: config.callbacksRegisteredAt?.toISOString() ?? null,
 }) : null;
 
+const publicUser = ({ passwordHash: _passwordHash, ...user }: typeof usersTable.$inferSelect) => user;
+
+const smsFinancials = async (pharmacyId: number) => {
+  const [[row]] = await pool.query<any[]>(`
+    SELECT
+      COALESCE(w.balance, 0) AS smsCredit,
+      COALESCE(SUM(CASE WHEN sp.status IN ('paid','processing','completed','sent','partially_failed') THEN sp.paid_amount ELSE 0 END), 0) AS smsRevenue,
+      COALESCE(SUM(m.actual_cost), 0) AS smsSendCost,
+      COALESCE(SUM(sp.refund_credit), 0) AS refundCredit
+    FROM pharmacies p
+    LEFT JOIN sms_wallets w ON w.pharmacy_id = p.id
+    LEFT JOIN sms_purchases sp ON sp.pharmacy_id = p.id
+    LEFT JOIN messages m ON m.id = sp.message_id
+    WHERE p.id = ?
+    GROUP BY p.id, w.balance
+  `, [pharmacyId]);
+  const smsCredit = Number(row?.smsCredit ?? 0);
+  const smsRevenue = Number(row?.smsRevenue ?? 0);
+  const smsSendCost = Number(row?.smsSendCost ?? 0);
+  const refundCredit = Number(row?.refundCredit ?? 0);
+  return { smsCredit, smsRevenue, smsSendCost, refundCredit, smsCommission: smsRevenue - smsSendCost - refundCredit };
+};
+
+const recentCampaigns = async (pharmacyId: number) => {
+  const [rows] = await pool.query<any[]>(`
+    SELECT
+      m.id, m.title, m.status, m.recipient_count AS recipientCount, m.actual_cost AS actualCost,
+      sp.paid_amount AS paidAmount, sp.refund_credit AS refundCredit, m.created_at AS createdAt
+    FROM messages m
+    LEFT JOIN sms_purchases sp ON sp.message_id = m.id
+    WHERE m.pharmacy_id = ?
+    ORDER BY m.created_at DESC
+    LIMIT 10
+  `, [pharmacyId]);
+  return rows.map(row => ({
+    ...row,
+    recipientCount: Number(row.recipientCount ?? 0),
+    actualCost: Number(row.actualCost ?? 0),
+    paidAmount: Number(row.paidAmount ?? 0),
+    refundCredit: Number(row.refundCredit ?? 0),
+  }));
+};
+
 router.get("/pharmacies", async (_req, res) => {
   try {
     const pharmacies = await db.select().from(pharmaciesTable).orderBy(desc(pharmaciesTable.createdAt));
     const result = await Promise.all(pharmacies.map(async pharmacy => {
       const [{ value }] = await db.select({ value: count() }).from(usersTable).where(eq(usersTable.pharmacyId, pharmacy.id));
       const [config] = await db.select().from(mpesaConfigsTable).where(eq(mpesaConfigsTable.pharmacyId, pharmacy.id));
-      const [wallet] = await db.select().from(smsWalletsTable).where(eq(smsWalletsTable.pharmacyId, pharmacy.id));
-      return { ...pharmacy, userCount: Number(value), mpesa: formatConfig(config), smsWalletBalance: Number(wallet?.balance ?? 0), modules: await getEnabledModules(pharmacy.id) };
+      const financials = await smsFinancials(pharmacy.id);
+      return { ...pharmacy, userCount: Number(value), mpesa: formatConfig(config), smsWalletBalance: financials.smsCredit, sms: financials, modules: await getEnabledModules(pharmacy.id) };
     }));
     res.json(result);
   } catch (error) {
@@ -56,27 +99,20 @@ router.get("/pharmacies", async (_req, res) => {
 });
 
 router.get("/users", async (_req, res) => {
-  const users = await db.select().from(usersTable).orderBy(desc(usersTable.createdAt));
-  const pharmacies = await db.select().from(pharmaciesTable);
-  const pharmacyById = new Map(pharmacies.map(pharmacy => [pharmacy.id, pharmacy]));
-  res.json(users.map(({ passwordHash: _passwordHash, ...user }) => ({
-    ...user,
-    pharmacy: user.pharmacyId ? pharmacyById.get(user.pharmacyId) ?? null : null,
-  })));
+  const users = await db.select().from(usersTable).where(eq(usersTable.role, "super_admin")).orderBy(desc(usersTable.createdAt));
+  res.json(users.map(publicUser));
 });
 
 router.post("/users", async (req, res) => {
-  const { name, email, phone, password, role = "cashier", pharmacyId } = req.body;
+  const { name, email, phone, password } = req.body;
   if (!name || !email || !phone || !password) return void res.status(400).json({ error: "Name, email, phone, and password are required" });
-  if (!["super_admin", "pharmacy_owner", "manager", "cashier"].includes(role)) return void res.status(400).json({ error: "Invalid role" });
-  if (role !== "super_admin" && !Number(pharmacyId)) return void res.status(400).json({ error: "Choose a pharmacy for pharmacy users" });
   const [{ id }] = await db.insert(usersTable).values({
     name,
     email: String(email).toLowerCase(),
     phone: normalizePhone(phone),
     passwordHash: await bcrypt.hash(String(password), 12),
-    role,
-    pharmacyId: role === "super_admin" ? null : Number(pharmacyId),
+    role: "super_admin",
+    pharmacyId: null,
     isActive: true,
   }).$returningId();
   res.status(201).json({ id });
@@ -84,14 +120,13 @@ router.post("/users", async (req, res) => {
 
 router.patch("/users/:id", async (req, res) => {
   const id = Number(req.params.id);
-  const { name, email, phone, password, role, pharmacyId, isActive } = req.body;
-  if (role !== undefined && !["super_admin", "pharmacy_owner", "manager", "cashier"].includes(role)) return void res.status(400).json({ error: "Invalid role" });
+  const [target] = await db.select().from(usersTable).where(and(eq(usersTable.id, id), eq(usersTable.role, "super_admin"))).limit(1);
+  if (!target) return void res.status(404).json({ error: "Super admin user not found" });
+  const { name, email, phone, password, isActive } = req.body;
   const update: Record<string, unknown> = {
     ...(name !== undefined && { name }),
     ...(email !== undefined && { email: String(email).toLowerCase() }),
     ...(phone !== undefined && { phone: normalizePhone(phone) }),
-    ...(role !== undefined && { role }),
-    ...(pharmacyId !== undefined && { pharmacyId: role === "super_admin" ? null : Number(pharmacyId) || null }),
     ...(isActive !== undefined && { isActive: Boolean(isActive) }),
   };
   if (password) update.passwordHash = await bcrypt.hash(String(password), 12);
@@ -99,26 +134,82 @@ router.patch("/users/:id", async (req, res) => {
   res.json({ success: true });
 });
 
-router.get("/users/:id/permissions", async (req, res) => {
-  const userId = Number(req.params.id);
-  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
-  if (!user) return void res.status(404).json({ error: "User not found" });
-  if (user.role === "super_admin") {
-    return void res.json({ modules: PHARMACY_MODULES, enabledModules: DEFAULT_MODULE_KEYS, pharmacyModules: DEFAULT_MODULE_KEYS, unrestricted: true });
-  }
-  const pharmacyModules = await getEnabledModules(user.pharmacyId);
-  res.json({ modules: PHARMACY_MODULES, enabledModules: await getUserEnabledModules(user.id, user.pharmacyId), pharmacyModules, unrestricted: false });
+router.get("/pharmacies/:id/overview", async (req, res) => {
+  const pharmacyId = Number(req.params.id);
+  const [pharmacy] = await db.select().from(pharmaciesTable).where(eq(pharmaciesTable.id, pharmacyId)).limit(1);
+  if (!pharmacy) return void res.status(404).json({ error: "Pharmacy not found" });
+  const [{ value: userCount }] = await db.select({ value: count() }).from(usersTable).where(eq(usersTable.pharmacyId, pharmacyId));
+  const [config] = await db.select().from(mpesaConfigsTable).where(eq(mpesaConfigsTable.pharmacyId, pharmacyId));
+  res.json({
+    pharmacy,
+    userCount: Number(userCount),
+    mpesa: formatConfig(config),
+    sms: await smsFinancials(pharmacyId),
+    campaigns: await recentCampaigns(pharmacyId),
+    modules: await getEnabledModules(pharmacyId),
+  });
 });
 
-router.put("/users/:id/permissions", async (req, res) => {
-  const userId = Number(req.params.id);
-  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
-  if (!user) return void res.status(404).json({ error: "User not found" });
-  if (user.role === "super_admin") return void res.status(400).json({ error: "Super admins always have full admin access" });
+router.get("/pharmacies/:id/users", async (req, res) => {
+  const pharmacyId = Number(req.params.id);
+  const rows = await db.select().from(usersTable).where(eq(usersTable.pharmacyId, pharmacyId)).orderBy(desc(usersTable.createdAt));
+  res.json(rows.map(publicUser));
+});
+
+router.post("/pharmacies/:id/users", async (req, res) => {
+  const pharmacyId = Number(req.params.id);
+  const { name, email, phone, password, role = "cashier" } = req.body;
+  if (!["pharmacy_owner", "manager", "cashier"].includes(role)) return void res.status(400).json({ error: "Invalid pharmacy role" });
+  if (!name || !email || !phone || !password) return void res.status(400).json({ error: "Name, email, phone, and password are required" });
+  const [{ id }] = await db.insert(usersTable).values({
+    name,
+    email: String(email).toLowerCase(),
+    phone: normalizePhone(phone),
+    passwordHash: await bcrypt.hash(String(password), 12),
+    role,
+    pharmacyId,
+    isActive: true,
+  }).$returningId();
+  res.status(201).json({ id });
+});
+
+router.patch("/pharmacies/:id/users/:userId", async (req, res) => {
+  const pharmacyId = Number(req.params.id);
+  const userId = Number(req.params.userId);
+  const [target] = await db.select().from(usersTable).where(and(eq(usersTable.id, userId), eq(usersTable.pharmacyId, pharmacyId))).limit(1);
+  if (!target) return void res.status(404).json({ error: "Pharmacy user not found" });
+  const { name, email, phone, password, role, isActive } = req.body;
+  if (role !== undefined && !["pharmacy_owner", "manager", "cashier"].includes(role)) return void res.status(400).json({ error: "Invalid pharmacy role" });
+  const update: Record<string, unknown> = {
+    ...(name !== undefined && { name }),
+    ...(email !== undefined && { email: String(email).toLowerCase() }),
+    ...(phone !== undefined && { phone: normalizePhone(phone) }),
+    ...(role !== undefined && { role }),
+    ...(isActive !== undefined && { isActive: Boolean(isActive) }),
+  };
+  if (password) update.passwordHash = await bcrypt.hash(String(password), 12);
+  await db.update(usersTable).set(update).where(and(eq(usersTable.id, userId), eq(usersTable.pharmacyId, pharmacyId)));
+  res.json({ success: true });
+});
+
+router.get("/pharmacies/:id/users/:userId/permissions", async (req, res) => {
+  const pharmacyId = Number(req.params.id);
+  const userId = Number(req.params.userId);
+  const [user] = await db.select().from(usersTable).where(and(eq(usersTable.id, userId), eq(usersTable.pharmacyId, pharmacyId))).limit(1);
+  if (!user) return void res.status(404).json({ error: "Pharmacy user not found" });
+  const pharmacyModules = await getEnabledModules(pharmacyId);
+  res.json({ modules: PHARMACY_MODULES, enabledModules: await getUserEnabledModules(user.id, pharmacyId), pharmacyModules });
+});
+
+router.put("/pharmacies/:id/users/:userId/permissions", async (req, res) => {
+  const pharmacyId = Number(req.params.id);
+  const userId = Number(req.params.userId);
+  const [user] = await db.select().from(usersTable).where(and(eq(usersTable.id, userId), eq(usersTable.pharmacyId, pharmacyId))).limit(1);
+  if (!user) return void res.status(404).json({ error: "Pharmacy user not found" });
   const requested: string[] = Array.isArray(req.body.modules) ? req.body.modules.map(String) : [];
-  const pharmacyModules = new Set<string>(await getEnabledModules(user.pharmacyId));
+  const pharmacyModules = new Set<string>(await getEnabledModules(pharmacyId));
   await setUserEnabledModules(user.id, requested.filter(key => pharmacyModules.has(key)));
-  res.json({ modules: await getUserEnabledModules(user.id, user.pharmacyId) });
+  res.json({ modules: await getUserEnabledModules(user.id, pharmacyId) });
 });
 
 router.get("/modules", async (_req, res) => {

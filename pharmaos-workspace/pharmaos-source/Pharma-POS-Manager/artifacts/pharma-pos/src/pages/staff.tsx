@@ -7,15 +7,21 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { UserPlus, Users } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ShieldCheck, UserPlus, Users } from "lucide-react";
 
 const emptyForm = { name: "", email: "", phone: "", password: "", role: "cashier" as "cashier" | "manager" };
+type Module = { key: string; label: string };
+type StaffMember = { id: number; name: string; email: string; phone: string; role: "pharmacy_owner" | "manager" | "cashier"; isActive: boolean };
+type PermissionEditor = { user: StaffMember; modules: Module[]; enabledModules: string[]; pharmacyModules: string[] };
 
 export default function Staff() {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [form, setForm] = useState(emptyForm);
+  const [permissions, setPermissions] = useState<PermissionEditor | null>(null);
+  const [permissionsBusy, setPermissionsBusy] = useState(false);
   const { data: staff, isLoading } = useListStaff();
   const createStaff = useCreateStaffMember();
   const updateStaff = useUpdateStaffMember();
@@ -38,6 +44,38 @@ export default function Staff() {
       onSuccess: refresh,
       onError: (error) => toast({ title: error.message, variant: "destructive" }),
     });
+  };
+
+  const request = async (path: string, init?: RequestInit) => {
+    const response = await fetch(path, { ...init, headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } });
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(payload?.error || "Request failed");
+    return payload;
+  };
+
+  const canManage = (member: StaffMember) => user?.role === "pharmacy_owner" ? ["manager", "cashier"].includes(member.role) : member.role === "cashier";
+
+  const openPermissions = async (member: StaffMember) => {
+    try {
+      const payload = await request(`/api/staff/${member.id}/permissions`);
+      setPermissions({ user: member, modules: payload.modules, enabledModules: payload.enabledModules, pharmacyModules: payload.pharmacyModules });
+    } catch (error: any) {
+      toast({ title: error.message || "Unable to load permissions", variant: "destructive" });
+    }
+  };
+
+  const savePermissions = async () => {
+    if (!permissions) return;
+    setPermissionsBusy(true);
+    try {
+      await request(`/api/staff/${permissions.user.id}/permissions`, { method: "PUT", body: JSON.stringify({ modules: permissions.enabledModules }) });
+      setPermissions(null);
+      toast({ title: "Permissions saved" });
+    } catch (error: any) {
+      toast({ title: error.message || "Unable to save permissions", variant: "destructive" });
+    } finally {
+      setPermissionsBusy(false);
+    }
   };
 
   return (
@@ -66,12 +104,24 @@ export default function Staff() {
                 <td className="p-3">{member.phone}</td>
                 <td className="p-3 capitalize">{member.role.replace("_", " ")}</td>
                 <td className="p-3"><Badge variant={member.isActive ? "default" : "secondary"}>{member.isActive ? "Active" : "Disabled"}</Badge></td>
-                <td className="p-3 text-right">{member.role !== "pharmacy_owner" && <Button size="sm" variant="outline" onClick={() => toggleActive(member.id, member.isActive)}>{member.isActive ? "Disable" : "Enable"}</Button>}</td>
+                <td className="p-3 text-right"><div className="flex justify-end gap-2">{canManage(member) && <Button size="sm" variant="outline" onClick={() => void openPermissions(member)}><ShieldCheck className="h-4 w-4 mr-1" /> Permissions</Button>}{canManage(member) && <Button size="sm" variant="outline" onClick={() => toggleActive(member.id, member.isActive)}>{member.isActive ? "Disable" : "Enable"}</Button>}</div></td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+      <Dialog open={Boolean(permissions)} onOpenChange={open => !open && setPermissions(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Permissions for {permissions?.user.name}</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">Access can only be granted to modules enabled for this pharmacy.</p>
+          <div className="grid sm:grid-cols-2 gap-2 py-2">{permissions?.modules.map(module => {
+            const available = permissions.pharmacyModules.includes(module.key);
+            const checked = permissions.enabledModules.includes(module.key);
+            return <label key={module.key} className={`rounded-lg border p-3 flex items-center gap-3 ${available ? "" : "opacity-40"}`}><input type="checkbox" disabled={!available} checked={checked} onChange={() => setPermissions(current => current ? { ...current, enabledModules: checked ? current.enabledModules.filter(key => key !== module.key) : [...current.enabledModules, module.key] } : current)} /><span>{module.label}</span>{!available && <span className="ml-auto text-[10px] uppercase">Pharmacy disabled</span>}</label>;
+          })}</div>
+          <Button disabled={permissionsBusy} onClick={() => void savePermissions()}>{permissionsBusy ? "Saving..." : "Save permissions"}</Button>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
