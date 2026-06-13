@@ -12,6 +12,8 @@ import {
 import { PharmaPOSLogo } from "./PharmaPOSLogo";
 import { useAuth } from "@/contexts/AuthContext";
 
+const PULSE_CLOUD_URL = "https://pulsecloud.theleasemaster.com";
+
 export function Sidebar() {
   const [location] = useLocation();
   const { user, modules, logout } = useAuth();
@@ -103,7 +105,12 @@ export function Sidebar() {
             <LogOut size={12} />
           </button>
         </div>
-        <p className="text-[9px] text-sidebar-muted text-center tracking-wider">PharmaOS v1.0 · EAT (GMT+3)</p>
+        <p className="text-[9px] text-sidebar-muted text-center tracking-wider">
+          PharmaOS v1.0 · powered by{" "}
+          <a href={PULSE_CLOUD_URL} target="_blank" rel="noreferrer" className="text-green-300/70 hover:text-green-300 underline-offset-2 hover:underline">
+            LeaseMaster Pulse Cloud
+          </a>
+        </p>
       </div>
     </div>
   );

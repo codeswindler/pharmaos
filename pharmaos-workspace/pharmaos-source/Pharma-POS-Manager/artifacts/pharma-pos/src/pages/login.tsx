@@ -8,19 +8,21 @@ import {
 } from "lucide-react";
 
 const FEATURES = [
-  { icon: ShoppingCart, label: "Point of Sale", desc: "Fast, touch-friendly checkout with barcode scanning" },
-  { icon: Package, label: "Inventory Management", desc: "Real-time stock tracking with low-stock alerts" },
-  { icon: CreditCard, label: "M-PESA & Cash Payments", desc: "Integrated M-PESA STK push and cash handling" },
-  { icon: ReceiptText, label: "Payment Ledger", desc: "Complete sales, split-payment, and receipt history" },
-  { icon: BarChart3, label: "Analytics & Reports", desc: "Revenue trends, top products, performance insights" },
-  { icon: MessageSquare, label: "SMS Campaigns", desc: "Reach contacts captured automatically from M-PESA sales" },
+  { icon: ShoppingCart, label: "Fast Checkout", desc: "Serve customers quickly with a clean, cashier-friendly POS" },
+  { icon: Package, label: "Stock Control", desc: "Track quantities, reservations, and low-stock items in real time" },
+  { icon: CreditCard, label: "M-PESA Ready", desc: "Match customer payments and support split cash/M-PESA sales" },
+  { icon: ReceiptText, label: "Payment Ledger", desc: "Keep every sale, receipt, and payment trail reconciled" },
+  { icon: BarChart3, label: "Owner Visibility", desc: "See sales, inventory movement, and shop performance clearly" },
+  { icon: MessageSquare, label: "SMS Outreach", desc: "Reach sales contacts with billed, auditable SMS campaigns" },
 ];
 
-const STATS = [
-  { value: "500+", label: "Pharmacies Onboarded" },
-  { value: "KES 2B+", label: "Transactions Processed" },
-  { value: "99.9%", label: "Uptime Guaranteed" },
+const SELLING_POINTS = [
+  { value: "Sell", label: "Checkout, payments, and receipts in one flow" },
+  { value: "Control", label: "Stock, staff access, and pharmacy modules" },
+  { value: "Grow", label: "SMS campaigns from real sales contacts" },
 ];
+
+const PULSE_CLOUD_URL = "https://pulsecloud.theleasemaster.com";
 
 export default function LoginPage() {
   const [, navigate] = useLocation();
@@ -82,13 +84,13 @@ export default function LoginPage() {
         {/* Headline */}
         <div className="relative z-10 my-8">
           <h1 className="text-4xl font-black text-white leading-tight mb-4">
-            The complete pharmacy<br />
+            Built for pharmacies that<br />
             <span style={{ background: "linear-gradient(90deg, #00ffaa, #00c46a)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
-              operating system.
+              sell, track, and grow.
             </span>
           </h1>
           <p className="text-white/55 text-lg leading-relaxed max-w-md">
-            Run your pharmacy smarter — from dispensing to payments, inventory to sales outreach, all in one seamless platform built for Kenyan pharmacies.
+            "Run the counter with confidence, keep stock accountable, and turn every completed sale into a clear business record."
           </p>
         </div>
 
@@ -108,12 +110,12 @@ export default function LoginPage() {
           ))}
         </div>
 
-        {/* Stats */}
+        {/* Selling points */}
         <div className="relative z-10 flex gap-8 pt-6" style={{ borderTop: "1px solid rgba(0,196,106,0.12)" }}>
-          {STATS.map(({ value, label }) => (
-            <div key={label}>
-              <p className="text-2xl font-black" style={{ background: "linear-gradient(90deg,#00ffaa,#00c46a)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>{value}</p>
-              <p className="text-white/45 text-xs">{label}</p>
+          {SELLING_POINTS.map(({ value, label }) => (
+            <div key={value} className="max-w-[190px]">
+              <p className="text-xl font-black" style={{ background: "linear-gradient(90deg,#00ffaa,#00c46a)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>{value}</p>
+              <p className="text-white/45 text-xs leading-relaxed">{label}</p>
             </div>
           ))}
         </div>
@@ -208,8 +210,12 @@ export default function LoginPage() {
             </div>
           </div>
 
-          <p className="mt-10 text-center text-xs text-white/20">
-            PharmaOS v1.0 · EAT (GMT+3) · © 2026
+          <p className="mt-10 text-center text-xs text-white/25">
+            PharmaOS v1.0 · powered by{" "}
+            <a className="text-green-300/70 hover:text-green-300 underline-offset-4 hover:underline" href={PULSE_CLOUD_URL} target="_blank" rel="noreferrer">
+              LeaseMaster Pulse Cloud
+            </a>
+            {" "}· © 2026
           </p>
         </div>
       </div>
