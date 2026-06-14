@@ -70,6 +70,20 @@ export default function LoginPage() {
           from { opacity: 0; transform: translateX(-10px); }
           to { opacity: 1; transform: translateX(0); }
         }
+        .login-hero-main {
+          margin-top: clamp(52px, 8vh, 80px);
+        }
+        @media (max-height: 820px) {
+          .login-hero-main {
+            margin-top: 36px;
+          }
+          .login-hero-feature {
+            gap: 0.5rem;
+          }
+          .login-hero-point-label {
+            line-height: 1.35;
+          }
+        }
         @media (prefers-reduced-motion: reduce) {
           [data-login-motion] {
             animation: none !important;
@@ -81,7 +95,7 @@ export default function LoginPage() {
       `}</style>
       {/* Left — Marketing panel */}
       <div
-        className="hidden lg:grid grid-rows-[auto_1fr_auto] w-[60%] p-8 xl:p-10 relative overflow-hidden"
+        className="hidden lg:flex lg:flex-col w-[60%] p-8 xl:p-10 relative overflow-hidden"
         style={{
           background: "linear-gradient(145deg, #080f1c 0%, #081a10 60%, #0a2218 100%)",
           borderRight: "1px solid rgba(0,196,106,0.12)",
@@ -110,10 +124,10 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <div className="relative z-10 grid grid-cols-[minmax(0,1.15fr)_minmax(280px,.85fr)] gap-8 xl:gap-10 items-center py-6">
+        <div className="login-hero-main relative z-10">
           {/* Headline */}
-          <div className="max-w-xl">
-            <h1 className="text-4xl font-black text-white leading-tight mb-4">
+          <div className="max-w-3xl">
+            <h1 className="text-[2.65rem] xl:text-5xl font-black text-white leading-[1.08] mb-5">
               Built for pharmacies that<br />
               <span data-login-motion className="login-hero-word" style={{ animation: "pharmaos-word-glow 4.8s ease-in-out infinite", animationDelay: "0s" }}>sell</span>
               <span className="text-white/75">, </span>
@@ -122,16 +136,16 @@ export default function LoginPage() {
               <span data-login-motion className="login-hero-word" style={{ animation: "pharmaos-word-glow 4.8s ease-in-out infinite", animationDelay: "3.2s" }}>grow</span>
               <span className="text-white/75">.</span>
             </h1>
-            <p className="text-white/58 text-base xl:text-lg leading-relaxed max-w-lg">
+            <p className="text-white/58 text-base xl:text-lg leading-relaxed max-w-[34rem]">
               "Run the counter with confidence, keep stock accountable, and turn every completed sale into a clear business record."
             </p>
           </div>
 
           {/* Feature list */}
-          <div className="grid grid-cols-1 gap-2.5">
-            <p className="text-[11px] uppercase tracking-[0.28em] text-green-300/50 mb-1">Built-in workflows</p>
+          <div className="mt-12 grid grid-cols-2 gap-x-8 gap-y-3 max-w-3xl">
+            <p className="col-span-2 text-[11px] uppercase tracking-[0.28em] text-green-300/50">Built-in workflows</p>
             {FEATURES.map(({ icon: Icon, label, desc }, index) => (
-              <div key={label} data-login-motion className="flex items-start gap-3 opacity-0" style={{ animation: "pharmaos-feature-in .45s ease-out forwards", animationDelay: `${index * 90}ms` }}>
+              <div key={label} data-login-motion className="login-hero-feature flex items-start gap-3 opacity-0" style={{ animation: "pharmaos-feature-in .45s ease-out forwards", animationDelay: `${index * 90}ms` }}>
                 <div className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center mt-0.5"
                   style={{ background: "rgba(0,196,106,0.12)", border: "1px solid rgba(0,196,106,0.2)" }}>
                   <Icon size={15} className="text-green-400" />
@@ -146,11 +160,11 @@ export default function LoginPage() {
         </div>
 
         {/* Selling points */}
-        <div className="relative z-10 flex gap-8 pt-5" style={{ borderTop: "1px solid rgba(0,196,106,0.12)" }}>
+        <div className="relative z-10 grid grid-cols-3 gap-8 mt-auto pt-5" style={{ borderTop: "1px solid rgba(0,196,106,0.12)" }}>
           {SELLING_POINTS.map(({ value, label, delay }) => (
             <div key={value} data-login-motion className="max-w-[190px]" style={{ animation: "pharmaos-point-rise 4.8s ease-in-out infinite", animationDelay: delay }}>
               <p className="text-xl font-black" style={{ background: "linear-gradient(90deg,#00ffaa,#00c46a)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>{value}</p>
-              <p className="text-white/45 text-xs leading-relaxed">{label}</p>
+              <p className="login-hero-point-label text-white/45 text-xs leading-relaxed">{label}</p>
             </div>
           ))}
         </div>
