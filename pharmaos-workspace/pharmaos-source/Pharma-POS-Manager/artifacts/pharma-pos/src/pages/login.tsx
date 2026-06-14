@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { PharmaPOSLogo } from "@/components/layout/PharmaPOSLogo";
 import {
   ShoppingCart, Package, CreditCard, BarChart3, ReceiptText, MessageSquare,
-  ChevronRight, Eye, EyeOff, Loader2, CheckCircle2
+  ChevronRight, Eye, EyeOff, Loader2
 } from "lucide-react";
 
 const FEATURES = [
@@ -83,6 +83,9 @@ export default function LoginPage() {
           .login-hero-point-label {
             line-height: 1.35;
           }
+          .login-selling-points {
+            display: none;
+          }
         }
         @media (prefers-reduced-motion: reduce) {
           [data-login-motion] {
@@ -142,8 +145,8 @@ export default function LoginPage() {
           </div>
 
           {/* Feature list */}
-          <div className="mt-12 grid grid-cols-2 gap-x-8 gap-y-3 max-w-3xl">
-            <p className="col-span-2 text-[11px] uppercase tracking-[0.28em] text-green-300/50">Built-in workflows</p>
+          <div className="mt-10 grid grid-cols-1 gap-y-3 max-w-xl">
+            <p className="text-[11px] uppercase tracking-[0.28em] text-green-300/50">Built-in workflows</p>
             {FEATURES.map(({ icon: Icon, label, desc }, index) => (
               <div key={label} data-login-motion className="login-hero-feature flex items-start gap-3 opacity-0" style={{ animation: "pharmaos-feature-in .45s ease-out forwards", animationDelay: `${index * 90}ms` }}>
                 <div className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center mt-0.5"
@@ -160,7 +163,7 @@ export default function LoginPage() {
         </div>
 
         {/* Selling points */}
-        <div className="relative z-10 grid grid-cols-3 gap-8 mt-auto pt-5" style={{ borderTop: "1px solid rgba(0,196,106,0.12)" }}>
+        <div className="login-selling-points relative z-10 grid grid-cols-3 gap-8 mt-auto pt-5" style={{ borderTop: "1px solid rgba(0,196,106,0.12)" }}>
           {SELLING_POINTS.map(({ value, label, delay }) => (
             <div key={value} data-login-motion className="max-w-[190px]" style={{ animation: "pharmaos-point-rise 4.8s ease-in-out infinite", animationDelay: delay }}>
               <p className="text-xl font-black" style={{ background: "linear-gradient(90deg,#00ffaa,#00c46a)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>{value}</p>
@@ -248,18 +251,7 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="mt-8 space-y-3">
-            <div className="flex items-start gap-2 text-xs text-white/35">
-              <CheckCircle2 size={12} className="text-green-400/60 mt-0.5 flex-shrink-0" />
-              <span>Admin accounts are redirected to the system management panel</span>
-            </div>
-            <div className="flex items-start gap-2 text-xs text-white/35">
-              <CheckCircle2 size={12} className="text-green-400/60 mt-0.5 flex-shrink-0" />
-              <span>Pharmacy staff go directly to their shop dashboard</span>
-            </div>
-          </div>
-
-          <p className="mt-10 text-center text-xs text-white/25">
+          <p className="mt-12 text-center text-xs text-white/25">
             PharmaOS v1.0 · powered by{" "}
             <a className="text-green-300/70 hover:text-green-300 underline-offset-4 hover:underline" href={PULSE_CLOUD_URL} target="_blank" rel="noreferrer">
               LeaseMaster Pulse Cloud

@@ -7,7 +7,7 @@ interface Stats {
   total: number;
   active: number;
   suspended: number;
-  monthlyRevenue: number;
+  paidSmsRevenue: number;
   totalUsers: number;
 }
 
@@ -27,7 +27,7 @@ export default function AdminDashboard() {
     { label: "Total Pharmacies", value: stats?.total ?? 0, icon: Building2, color: "#00c46a", bg: "rgba(0,196,106,0.1)", border: "rgba(0,196,106,0.2)" },
     { label: "Active Accounts", value: stats?.active ?? 0, icon: TrendingUp, color: "#3b82f6", bg: "rgba(59,130,246,0.1)", border: "rgba(59,130,246,0.2)" },
     { label: "Total Users", value: stats?.totalUsers ?? 0, icon: Users, color: "#a855f7", bg: "rgba(168,85,247,0.1)", border: "rgba(168,85,247,0.2)" },
-    { label: "Monthly Revenue", value: `KES ${(stats?.monthlyRevenue ?? 0).toLocaleString()}`, icon: DollarSign, color: "#f59e0b", bg: "rgba(245,158,11,0.1)", border: "rgba(245,158,11,0.2)", large: true },
+    { label: "Paid SMS Revenue", value: `KES ${(stats?.paidSmsRevenue ?? 0).toLocaleString()}`, icon: DollarSign, color: "#f59e0b", bg: "rgba(245,158,11,0.1)", border: "rgba(245,158,11,0.2)", large: true },
     { label: "Suspended", value: stats?.suspended ?? 0, icon: AlertTriangle, color: "#ef4444", bg: "rgba(239,68,68,0.08)", border: "rgba(239,68,68,0.2)" },
   ];
 

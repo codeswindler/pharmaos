@@ -359,10 +359,15 @@ router.get("/messages/:id/recipients", async (req, res) => {
 router.get("/stats", async (_req, res) => {
   const pharmacies = await db.select().from(pharmaciesTable);
   const [{ value: totalUsers }] = await db.select({ value: count() }).from(usersTable);
+  const [[revenue]] = await pool.query<any[]>(`
+    SELECT COALESCE(SUM(paid_amount), 0) AS actualRevenue
+    FROM sms_purchases
+    WHERE status IN ('paid', 'processing', 'completed', 'sent', 'partially_failed')
+  `);
   res.json({
     total: pharmacies.length, active: pharmacies.filter(p => p.status === "active").length,
     suspended: pharmacies.filter(p => p.status === "suspended").length,
-    monthlyRevenue: pharmacies.filter(p => p.planType === "subscription").reduce((sum, p) => sum + Number(p.planValue), 0),
+    paidSmsRevenue: Number(revenue?.actualRevenue ?? 0),
     totalUsers: Number(totalUsers),
   });
 });
