@@ -17,9 +17,9 @@ const FEATURES = [
 ];
 
 const SELLING_POINTS = [
-  { value: "Sell", label: "Checkout, payments, and receipts in one flow" },
-  { value: "Control", label: "Stock, staff access, and pharmacy modules" },
-  { value: "Grow", label: "SMS campaigns from real sales contacts" },
+  { value: "Sell", label: "Checkout, payments, and receipts in one flow", delay: "0s" },
+  { value: "Control", label: "Stock, staff access, and pharmacy modules", delay: "1.6s" },
+  { value: "Grow", label: "SMS campaigns from real sales contacts", delay: "3.2s" },
 ];
 
 const PULSE_CLOUD_URL = "https://pulsecloud.theleasemaster.com";
@@ -50,6 +50,28 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex" style={{ background: "#080f1c" }}>
+      <style>{`
+        @keyframes pharmaos-word-glow {
+          0%, 28%, 100% { opacity: .52; filter: none; transform: translateY(0); }
+          8%, 18% { opacity: 1; filter: drop-shadow(0 0 12px rgba(0, 232, 126, .42)); transform: translateY(-1px); }
+        }
+        @keyframes pharmaos-point-rise {
+          0%, 100% { opacity: .54; transform: translateY(0); }
+          14%, 34% { opacity: 1; transform: translateY(-3px); }
+        }
+        @keyframes pharmaos-feature-in {
+          from { opacity: 0; transform: translateX(-10px); }
+          to { opacity: 1; transform: translateX(0); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          [data-login-motion] {
+            animation: none !important;
+            opacity: 1 !important;
+            transform: none !important;
+            filter: none !important;
+          }
+        }
+      `}</style>
       {/* Left — Marketing panel */}
       <div
         className="hidden lg:flex flex-col justify-between w-[55%] p-12 relative overflow-hidden"
@@ -86,7 +108,12 @@ export default function LoginPage() {
           <h1 className="text-4xl font-black text-white leading-tight mb-4">
             Built for pharmacies that<br />
             <span style={{ background: "linear-gradient(90deg, #00ffaa, #00c46a)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
-              sell, track, and grow.
+              <span data-login-motion style={{ display: "inline-block", animation: "pharmaos-word-glow 4.8s ease-in-out infinite", animationDelay: "0s" }}>sell</span>
+              <span className="text-white/75">, </span>
+              <span data-login-motion style={{ display: "inline-block", animation: "pharmaos-word-glow 4.8s ease-in-out infinite", animationDelay: "1.6s" }}>track</span>
+              <span className="text-white/75">, and </span>
+              <span data-login-motion style={{ display: "inline-block", animation: "pharmaos-word-glow 4.8s ease-in-out infinite", animationDelay: "3.2s" }}>grow</span>
+              <span className="text-white/75">.</span>
             </span>
           </h1>
           <p className="text-white/55 text-lg leading-relaxed max-w-md">
@@ -96,8 +123,8 @@ export default function LoginPage() {
 
         {/* Feature list */}
         <div className="relative z-10 grid grid-cols-1 gap-3 mb-8">
-          {FEATURES.map(({ icon: Icon, label, desc }) => (
-            <div key={label} className="flex items-start gap-3">
+          {FEATURES.map(({ icon: Icon, label, desc }, index) => (
+            <div key={label} data-login-motion className="flex items-start gap-3 opacity-0" style={{ animation: "pharmaos-feature-in .45s ease-out forwards", animationDelay: `${index * 90}ms` }}>
               <div className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center mt-0.5"
                 style={{ background: "rgba(0,196,106,0.12)", border: "1px solid rgba(0,196,106,0.2)" }}>
                 <Icon size={15} className="text-green-400" />
@@ -112,8 +139,8 @@ export default function LoginPage() {
 
         {/* Selling points */}
         <div className="relative z-10 flex gap-8 pt-6" style={{ borderTop: "1px solid rgba(0,196,106,0.12)" }}>
-          {SELLING_POINTS.map(({ value, label }) => (
-            <div key={value} className="max-w-[190px]">
+          {SELLING_POINTS.map(({ value, label, delay }) => (
+            <div key={value} data-login-motion className="max-w-[190px]" style={{ animation: "pharmaos-point-rise 4.8s ease-in-out infinite", animationDelay: delay }}>
               <p className="text-xl font-black" style={{ background: "linear-gradient(90deg,#00ffaa,#00c46a)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>{value}</p>
               <p className="text-white/45 text-xs leading-relaxed">{label}</p>
             </div>
